@@ -1,0 +1,60 @@
+{
+  "_auto-CieodS8Z.js": {
+    "file": "assets/auto-CieodS8Z.js",
+    "name": "auto"
+  },
+  "_echo-config-911a3k1_.js": {
+    "file": "assets/echo-config-911a3k1_.js",
+    "name": "echo-config"
+  },
+  "resources/css/app.css": {
+    "file": "assets/app-CrQTsrzh.css",
+    "src": "resources/css/app.css",
+    "isEntry": true
+  },
+  "resources/js/admin-chat.js": {
+    "file": "assets/admin-chat-BH-1WelJ.js",
+    "name": "admin-chat",
+    "src": "resources/js/admin-chat.js",
+    "isEntry": true
+  },
+  "resources/js/admin-dashboard.js": {
+    "file": "assets/admin-dashboard-Btf5Zkj0.js",
+    "name": "admin-dashboard",
+    "src": "resources/js/admin-dashboard.js",
+    "isEntry": true,
+    "imports": [
+      "_auto-CieodS8Z.js"
+    ]
+  },
+  "resources/js/app.js": {
+    "file": "assets/app-BIy6l6tm.js",
+    "name": "app",
+    "src": "resources/js/app.js",
+    "isEntry": true,
+    "imports": [
+      "_echo-config-911a3k1_.js"
+    ],
+    "css": [
+      "assets/app-DvB2Xm2x.css"
+    ]
+  },
+  "resources/js/chat-widget.js": {
+    "file": "assets/chat-widget-DrbE5ZBM.js",
+    "name": "chat-widget",
+    "src": "resources/js/chat-widget.js",
+    "isEntry": true,
+    "imports": [
+      "_echo-config-911a3k1_.js"
+    ]
+  },
+  "resources/js/dashboard.js": {
+    "file": "assets/dashboard-C7SSJXj3.js",
+    "name": "dashboard",
+    "src": "resources/js/dashboard.js",
+    "isEntry": true,
+    "imports": [
+      "_auto-CieodS8Z.js"
+    ]
+  }
+}
