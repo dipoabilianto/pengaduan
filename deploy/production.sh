@@ -13,6 +13,14 @@
 #   bash deploy/production.sh [<dir-proyek>]        # default ~/sidumas
 #   DEPS="npm ci && npm run build" bash ...          # lewati build bila DEPS kosong
 #
+# Semua nilai bisa di-prefill lewat env var (prompt dilewati). Prefix SIDUMAS_:
+#   SIDUMAS_DOMAIN, SIDUMAS_DB_DATABASE, SIDUMAS_DB_USERNAME, SIDUMAS_DB_PASSWORD,
+#   SIDUMAS_PUSHER_APP_ID, _PUSHER_APP_KEY, _PUSHER_APP_SECRET, _PUSHER_APP_CLUSTER,
+#   SIDUMAS_MAIL_MAILER, _MAIL_HOST, _MAIL_USERNAME, _MAIL_PASSWORD, _MAIL_FROM_ADDRESS,
+#   SIDUMAS_ADMIN_EMAIL, SIDUMAS_ADMIN_PASSWORD
+# Contoh:
+#   SIDUMAS_MAIL_MAILER=log SIDUMAS_PUSHER_APP_KEY=xxx bash deploy/production.sh
+#
 set -euo pipefail
 
 PROJECT_DIR="${1:-$HOME/sidumas}"
@@ -25,9 +33,31 @@ command -v php >/dev/null || { echo "ERROR: PHP tidak ditemukan di PATH."; exit 
 PHP_BIN="$(command -v php || true)"
 echo "==> PHP           : $PHP_BIN ($("$PHP_BIN" -r 'echo PHP_VERSION;' 2>/dev/null || echo '?'))"
 
+# Impor prefill dari env SIDUMAS_* (nilai dari env menang, prompt dilewati).
+for suffix in DOMAIN DB_DATABASE DB_USERNAME DB_PASSWORD \
+              PUSHER_APP_ID PUSHER_APP_KEY PUSHER_APP_SECRET PUSHER_APP_CLUSTER \
+              MAIL_MAILER MAIL_HOST MAIL_USERNAME MAIL_PASSWORD MAIL_FROM_ADDRESS \
+              ADMIN_EMAIL ADMIN_PASSWORD; do
+    evar="SIDUMAS_${suffix}"
+    if [[ -n "${!evar:-}" ]]; then
+        printf -v "$suffix" '%s' "${!evar}"
+        case "$suffix" in
+            DB_PASSWORD|PUSHER_APP_SECRET|ADMIN_PASSWORD)
+                echo "(prefill) $suffix = ***" ;;
+            *)
+                echo "(prefill) $suffix = ${!suffix}" ;;
+        esac
+    fi
+done
+
 prompt() {
-    # prompt <var> <pesan> [default]; simpan hasil ke variabel global <var>
+    # prompt <var> <pesan> [default]; kalau <var> sudah terisi via env, dipakai
+    # apa adanya tanpa menanya.
     local var="$1" msg="$2" default="${3:-}"
+    if [[ -n "${!var:-}" ]]; then
+        echo "$msg: ${!var}"
+        return 0
+    fi
     if [[ -n "$default" ]]; then
         read -rp "$msg [$default]: " "$var"
         if [[ -z "${!var:-}" ]]; then printf -v "$var" '%s' "$default"; fi
@@ -38,8 +68,12 @@ prompt() {
 }
 
 prompt_secret() {
-    # prompt_secret <var> <pesan>; baca tanpa echo
+    # prompt_secret <var> <pesan>; baca tanpa echo (dilewati jika env sudah terisi)
     local var="$1" msg="$2" v2
+    if [[ -n "${!var:-}" ]]; then
+        echo "$msg: ***"
+        return 0
+    fi
     read -srp "$msg: " "$var"; echo
     read -srp "Ulangi $msg: " v2; echo
     [[ "${!var:-}" == "$v2" ]] || { echo "ERROR: tidak cocok."; exit 1; }
@@ -64,11 +98,20 @@ prompt_secret PUSHER_APP_SECRET "Pusher App Secret"
 prompt PUSHER_APP_CLUSTER "Pusher Cluster" "ap1"
 
 echo
-echo "==> SMTP (email di cPanel untuk notifikasi)"
-prompt MAIL_HOST "SMTP host" "mail.${DOMAIN:-}"
-prompt MAIL_USERNAME "SMTP username (email cPanel)"
-prompt_secret MAIL_PASSWORD "SMTP password"
-prompt MAIL_FROM_ADDRESS "MAIL_FROM_ADDRESS" "$MAIL_USERNAME"
+echo "==> SMTP untuk notifikasi — kosongkan/bukan smtp = pakai log sementara"
+prompt MAIL_MAILER "Mailer (smtp / log)" "log"
+if [[ "${MAIL_MAILER:-}" == "smtp" ]]; then
+    prompt MAIL_HOST "SMTP host" "mail.${DOMAIN:-}"
+    prompt MAIL_USERNAME "SMTP username (email cPanel)"
+    prompt_secret MAIL_PASSWORD "SMTP password"
+    prompt MAIL_FROM_ADDRESS "MAIL_FROM_ADDRESS" "$MAIL_USERNAME"
+else
+    MAIL_MAILER=log
+    MAIL_HOST=
+    MAIL_USERNAME=
+    MAIL_PASSWORD=
+    MAIL_FROM_ADDRESS="admin@${DOMAIN}"
+fi
 
 echo
 echo "==> Akun admin superuser (login pertama dashboard)"
@@ -128,13 +171,17 @@ PUSHER_APP_CLUSTER=${PUSHER_APP_CLUSTER}
 VITE_PUSHER_APP_KEY=${PUSHER_APP_KEY}
 VITE_PUSHER_APP_CLUSTER=${PUSHER_APP_CLUSTER}
 
-MAIL_MAILER=smtp
+MAIL_MAILER=${MAIL_MAILER}
+EOF
+    if [[ "${MAIL_MAILER:-}" == "smtp" ]]; then
+        cat >> .env <<EOF
 MAIL_HOST=${MAIL_HOST}
 MAIL_PORT=587
 MAIL_USERNAME=${MAIL_USERNAME}
 MAIL_PASSWORD=${MAIL_PASSWORD}
 MAIL_FROM_ADDRESS=${MAIL_FROM_ADDRESS}
 EOF
+    fi
     echo "Blok produksi ditambahkan ke .env"
 else
     echo ".env sudah memuat blok produksi — biarkan (edit manual kalau butuh ubah nilai)."
