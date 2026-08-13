@@ -18,6 +18,11 @@ class ChatBroadcastAuthController extends Controller
      * then we hand-sign the Pusher-protocol channel auth response ourselves — the
      * exact same signature Reverb's own default auth route would produce, just
      * gated by our own guest-appropriate check instead of Auth::user().
+     *
+     * Reads whichever connection BROADCAST_CONNECTION actually points at — Reverb
+     * self-hosted locally, or a real Pusher account in production on hosts that can't
+     * keep a persistent WebSocket process alive (both speak the same wire protocol, so
+     * the hand-signed auth response works identically either way).
      */
     public function authenticate(Request $request): Response
     {
@@ -39,7 +44,7 @@ class ChatBroadcastAuthController extends Controller
             abort(403, 'Sesi chat tidak valid.');
         }
 
-        $config = config('broadcasting.connections.reverb');
+        $config = config('broadcasting.connections.'.config('broadcasting.default'));
 
         $pusher = new Pusher($config['key'], $config['secret'], $config['app_id']);
 
