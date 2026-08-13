@@ -59,6 +59,50 @@
     animation: maskot-bob 2.6s ease-in-out infinite;
 }
 
+/* Login split-panel (resources/views/layouts/guest.blade.php) — three blurred orbs
+   drifting at different speeds/directions for a slow parallax feel, plus a one-shot
+   fade-slide-in for the brand mark/heading/tagline stack. */
+@keyframes login-orb-a {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    50% { transform: translate(40px, -30px) scale(1.1); }
+}
+
+@keyframes login-orb-b {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    50% { transform: translate(-50px, 40px) scale(1.15); }
+}
+
+@keyframes login-orb-c {
+    0%, 100% { transform: translate(0, 0) scale(1); }
+    50% { transform: translate(30px, 50px) scale(0.9); }
+}
+
+.login-orb-a { animation: login-orb-a 14s ease-in-out infinite; }
+.login-orb-b { animation: login-orb-b 18s ease-in-out infinite; }
+.login-orb-c { animation: login-orb-c 22s ease-in-out infinite; }
+
+@keyframes login-brand-in {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.login-brand-in {
+    opacity: 0;
+    animation: login-brand-in 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .login-orb {
+        animation: none;
+    }
+
+    .login-brand-in {
+        opacity: 1;
+        animation: none;
+        transform: none;
+    }
+}
+
 @media (prefers-reduced-motion: reduce) {
     .maskot-idle {
         animation: none;
