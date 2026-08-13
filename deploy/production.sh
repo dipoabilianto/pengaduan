@@ -29,8 +29,11 @@ REPO_URL="${REPO_URL:-https://github.com/dipoabilianto/pengaduan.git}"
 echo "==> Target proyek : $PROJECT_DIR"
 echo "==> Repo          : $REPO_URL"
 
-command -v php >/dev/null || { echo "ERROR: PHP tidak ditemukan di PATH."; exit 1; }
-PHP_BIN="$(command -v php || true)"
+if [[ -z "${PHP_BIN:-}" ]] && ! command -v php >/dev/null; then
+    echo "ERROR: PHP tidak ditemukan di PATH (atau set PHP_BIN=<binary php> terlebih dahulu)."
+    exit 1
+fi
+PHP_BIN="${PHP_BIN:-$(command -v php || true)}"
 echo "==> PHP           : $PHP_BIN ($("$PHP_BIN" -r 'echo PHP_VERSION;' 2>/dev/null || echo '?'))"
 
 if ! "$PHP_BIN" -r 'exit(function_exists("proc_open") ? 0 : 1);' 2>/dev/null; then
