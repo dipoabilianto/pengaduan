@@ -1,0 +1,66 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+[x-cloak] {
+    display: none !important;
+}
+
+/* Status tracker (resources/views/components/status-tracker.blade.php) */
+@keyframes tracker-pop {
+    from { opacity: 0; transform: translateY(6px) scale(0.92); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes tracker-fill-h {
+    from { width: 0%; }
+    to { width: 100%; }
+}
+
+@keyframes tracker-fill-v {
+    from { height: 0%; }
+    to { height: 100%; }
+}
+
+.status-tracker .tracker-node {
+    opacity: 0;
+    animation: tracker-pop 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.status-tracker .tracker-fill-h {
+    width: 0%;
+    animation: tracker-fill-h 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.status-tracker .tracker-fill-v {
+    height: 0%;
+    animation: tracker-fill-v 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .status-tracker .tracker-node,
+    .status-tracker .tracker-fill-h,
+    .status-tracker .tracker-fill-v {
+        animation: none;
+        opacity: 1;
+        width: 100%;
+        height: 100%;
+    }
+}
+
+/* Maskot ULP (resources/views/components/chat-widget.blade.php) — idle bob on the
+   floating button, subtle/slow so it reads as "alive" without being distracting. */
+@keyframes maskot-bob {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-4px); }
+}
+
+.maskot-idle {
+    animation: maskot-bob 2.6s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .maskot-idle {
+        animation: none;
+    }
+}
