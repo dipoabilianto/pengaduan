@@ -43,6 +43,8 @@ kalau tidak, `.env` dan kode aplikasi jadi bisa diakses langsung lewat browser. 
 
 ## 3. Clone & Install
 
+Repo: https://github.com/dipoabilianto/pengaduan.git
+
 ```bash
 ssh user@namadomain.com
 cd ~
@@ -50,6 +52,10 @@ git clone https://github.com/dipoabilianto/pengaduan.git sidumas
 cd sidumas
 composer install --no-dev --optimize-autoloader
 ```
+
+Kalau repo-nya *private*, clone HTTPS harus pakai Personal Access Token
+(`https://<token>@github.com/...`) atau pasang SSH key di server dan clone lewat
+`git@github.com:dipoabilianto/pengaduan.git`.
 
 ## 4. Build Asset Frontend
 
@@ -101,6 +107,10 @@ PUSHER_APP_KEY=isi_dari_dashboard_pusher
 PUSHER_APP_SECRET=isi_dari_dashboard_pusher
 PUSHER_APP_CLUSTER=isi_dari_dashboard_pusher
 
+# Wajib sama dengan variabel pusher di atas — dipakai runtime oleh JS asset:
+VITE_PUSHER_APP_KEY="${PUSHER_APP_KEY}"
+VITE_PUSHER_APP_CLUSTER="${PUSHER_APP_CLUSTER}"
+
 MAIL_MAILER=smtp
 MAIL_HOST=mail.namadomain.com
 MAIL_PORT=587
@@ -119,10 +129,24 @@ runtime.
 ```bash
 php artisan migrate --force
 php artisan storage:link
-php artisan db:seed --class=RolesTableSeeder   # role + 4 akun awal (lihat catatan keamanan)
+php artisan db:seed --class=RolesTableSeeder   # role + permission saja (belum ada user)
 
 chmod -R 775 storage bootstrap/cache
 ```
+
+Lalu buat akun admin. `RolesTableSeeder` TIDAK membuat user (berbeda dengan
+`DatabaseSeeder` yang membuat 4 akun uji-coba berpassword `password`). Untuk produksi
+lebih aman buat 1 akun superuser langsung dengan password kuat lewat tinker
+(ganti email dan password):
+
+```bash
+php artisan tinker --execute="\$u = App\Models\User::updateOrCreate(['email' => 'admin@disdukcapiltubaba.go.id'], ['name' => 'Admin Utama', 'password' => 'PASSWORD_AMAN_PANJANG_UNIK', 'email_verified_at' => now()]); \$u->assignRole('superuser');"
+```
+
+Kalau lebih suka jalur cepat `php artisan db:seed --force` (DatabaseSeeder) untuk
+membuat 4 akun awal (`superuser@sidumas.test`, `admin@sidumas.test`,
+`pejabat@sidumas.test`, `pengawas@sidumas.test` — semua berpassword **`password`**),
+maka **segera login dan ganti password semuanya** sebelum aplikasi diumumkan ke publik.
 
 ## 7. Cron Job
 
@@ -144,10 +168,12 @@ Di cPanel → Cron Jobs, tambahkan (sesuaikan path ke lokasi proyek dan versi PH
 
 ## 8. Setelah Deploy — Wajib Dicek
 
-- [ ] **Ganti password 4 akun default.** `RolesTableSeeder`/`DatabaseSeeder` membuat
-      `superuser@sidumas.test`, `admin@sidumas.test`, `pejabat@sidumas.test`,
-      `pengawas@sidumas.test` dengan password **`password`** untuk semuanya — login dan
-      ganti semua password ini sebelum aplikasi diumumkan ke publik.
+- [ ] **Akun admin.** Kalau memakai `db:seed --force`, ganti password 4 akun default
+      (`superuser@sidumas.test`, dst — semua `password`) sebelum aplikasi diumumkan ke
+      publik. Kalau memakai tinker (langkah 6), pastikan email & password sudah diisi
+      dengan nilai yang kuat.
+- [ ] **`APP_ENV=production` dan `APP_DEBUG=false`** — cek di `.env`. Kalau `APP_DEBUG=true`,
+      error stack trace dan kredensial bisa bocor ke publik.
 - [ ] Isi kredensial AI (Groq/Anthropic/OpenAI/Gemini) lewat menu Pengaturan → AI di admin
       (bukan lewat `.env` — aplikasi ini menyimpannya terenkripsi di database, bukan env var).
 - [ ] Isi kredensial WhatsApp/Instagram (kalau dipakai) lewat menu Pengaturan masing-masing,
@@ -162,12 +188,16 @@ Di cPanel → Cron Jobs, tambahkan (sesuaikan path ke lokasi proyek dan versi PH
 ## 9. Verifikasi Akhir
 
 1. Buka `https://namadomain.com` — halaman publik & form pengaduan bisa diakses.
-2. Login admin, cek dashboard tampil (artinya DB & migrasi benar).
-3. Submit satu laporan uji coba lewat form publik — cek beberapa menit kemudian apakah
+2. Buka `https://namadomain.com/up` — harus menampilkan `{"status":"ok"}` (health check
+   bawaan Laravel, bukti aplikasi bangkit tanpa error).
+3. Login admin, cek dashboard tampil (artinya DB & migrasi benar).
+4. Submit satu laporan uji coba lewat form publik — cek beberapa menit kemudian apakah
    penilaian AI muncul di halaman detail laporan (kalau kredensial AI sudah diisi) —
    ini membuktikan cron queue worker benar-benar jalan.
-4. Buka widget chat di halaman publik, kirim pesan — balasan AI/petugas harus muncul
+5. Buka widget chat di halaman publik, kirim pesan — balasan AI/petugas harus muncul
    real-time tanpa refresh (ini membuktikan Pusher + `ChatBroadcastAuthController`
    terkonfigurasi benar). Kalau tidak real-time tapi lainnya normal, cek console browser
    untuk error koneksi WebSocket dan cocokkan `PUSHER_APP_CLUSTER` di `.env` server dengan
    `VITE_PUSHER_APP_CLUSTER` yang ter-build ke asset (lihat catatan di langkah 5).
+6. Pastikan `https://` semua asset (Mixpanel/DevTools → tab Network) — kalau ada asset
+   http, indikasi `APP_URL` atau document root salah.
