@@ -17,14 +17,12 @@ function makeGuestEcho() {
     });
 }
 
-const STORAGE_PHONE = 'sidumas_chat_phone';
-const STORAGE_TICKET = 'sidumas_chat_ticket_id';
-
 // How long the widget waits for the CITIZEN'S OWN next message before resetting back to
 // the phone-entry screen — AI/officer replies arriving don't reset this clock, only the
 // citizen's own activity does. Purely a frontend UX/privacy affordance (e.g. a shared
 // public computer); the ticket and its history in the backend are untouched, so typing
-// the same phone number back in resumes the same conversation via findOrStartFor().
+// the same phone number back in (and solving a fresh captcha) resumes the same
+// conversation, as long as it's still active — see ChatTicket::findOrStartFor().
 const IDLE_RESET_MS = 5 * 60 * 1000;
 
 const CTA_ACTIONS = {
@@ -45,6 +43,8 @@ window.chatWidget = function chatWidget() {
         open: false,
         step: 'phone',
         phone: '',
+        captcha: '',
+        captchaCode: '',
         pendingTicketNo: null,
         ticketId: null,
         messages: [],
@@ -68,11 +68,15 @@ window.chatWidget = function chatWidget() {
         ratingSaving: false,
 
         init() {
-            const savedPhone = localStorage.getItem(STORAGE_PHONE);
-            if (savedPhone) {
-                this.phone = savedPhone;
-                this.resume(savedPhone);
-            }
+            // One-time cleanup — a pre-session-based build of this widget cached the raw
+            // phone number here and silently replayed it to auto-resume. Nothing reads
+            // these keys anymore; leaving them behind would just be dead plaintext data
+            // sitting in the browser.
+            localStorage.removeItem('sidumas_chat_phone');
+            localStorage.removeItem('sidumas_chat_ticket_id');
+
+            this.refreshCaptcha();
+            this.resumeFromSession();
 
             window.addEventListener('chat-widget:open', (event) => {
                 this.open = true;
@@ -97,16 +101,27 @@ window.chatWidget = function chatWidget() {
             }
         },
 
-        resume(phone) {
+        /**
+         * Resumes an already-open conversation purely from the HttpOnly session
+         * cookie (see ChatController::session()) — no phone number involved, so a
+         * returning visitor within the same session lifetime never sees the phone/
+         * captcha screen at all.
+         */
+        resumeFromSession() {
             this.starting = true;
-            window.axios.post('/chat/mulai', { phone, related_ticket_no: this.pendingTicketNo })
-                .then((res) => this.enterTicket(res.data))
-                .catch(() => {
-                    // Stale/invalid saved phone — fall back to asking again.
-                    localStorage.removeItem(STORAGE_PHONE);
-                    localStorage.removeItem(STORAGE_TICKET);
+            window.axios.get('/chat/sesi')
+                .then((res) => {
+                    if (res.data.active) {
+                        this.enterTicket(res.data);
+                    }
                 })
+                .catch(() => {})
                 .finally(() => { this.starting = false; });
+        },
+
+        refreshCaptcha() {
+            window.axios.get('/captcha')
+                .then((res) => { this.captchaCode = res.data.code; });
         },
 
         startChat() {
@@ -118,13 +133,14 @@ window.chatWidget = function chatWidget() {
             this.error = null;
             this.starting = true;
 
-            window.axios.post('/chat/mulai', { phone: this.phone, related_ticket_no: this.pendingTicketNo })
-                .then((res) => {
-                    localStorage.setItem(STORAGE_PHONE, this.phone);
-                    this.enterTicket(res.data);
-                })
+            window.axios.post('/chat/mulai', { phone: this.phone, related_ticket_no: this.pendingTicketNo, captcha: this.captcha })
+                .then((res) => this.enterTicket(res.data))
                 .catch((err) => {
-                    this.error = err.response?.data?.errors?.phone?.[0] ?? 'Gagal memulai chat. Coba lagi.';
+                    this.error = err.response?.data?.errors?.captcha?.[0]
+                        ?? err.response?.data?.errors?.phone?.[0]
+                        ?? 'Gagal memulai chat. Coba lagi.';
+                    this.captcha = '';
+                    this.refreshCaptcha();
                 })
                 .finally(() => { this.starting = false; });
         },
@@ -138,7 +154,6 @@ window.chatWidget = function chatWidget() {
             this.selectedRatingScale = null;
             this.ratingComment = '';
             this.step = 'chat';
-            localStorage.setItem(STORAGE_TICKET, String(data.ticket_id));
             this.subscribe();
             this.lastCitizenActivityAt = Date.now();
             this.startIdleWatch();
@@ -151,16 +166,22 @@ window.chatWidget = function chatWidget() {
         /**
          * "Lihat Riwayat Chat Sebelumnya" — only offered by the server (history_hidden)
          * for a ticket closed 6-12h ago; past that the server stops returning history at
-         * all regardless of this flag (see ChatController::start()).
+         * all regardless of this flag (see ChatController::session()). Goes through the
+         * session endpoint (not /chat/mulai) — by the time this button is visible the
+         * session already proves ownership of the open ticket, no phone number needed.
          */
         revealHistory() {
-            if (! this.phone || this.revealing) {
+            if (this.revealing) {
                 return;
             }
 
             this.revealing = true;
-            window.axios.post('/chat/mulai', { phone: this.phone, related_ticket_no: this.pendingTicketNo, reveal_history: true })
-                .then((res) => this.enterTicket(res.data))
+            window.axios.get('/chat/sesi', { params: { reveal_history: true } })
+                .then((res) => {
+                    if (res.data.active) {
+                        this.enterTicket(res.data);
+                    }
+                })
                 .catch(() => {
                     this.error = 'Gagal memuat riwayat. Coba lagi.';
                 })
@@ -258,10 +279,14 @@ window.chatWidget = function chatWidget() {
         },
 
         /**
-         * Session-only reset, not a backend action — the ticket and its history are
-         * untouched (see ProcessInactiveChatTicketsCommand for the separate, much longer
-         * backend inactivity policy). Typing the same phone number back in resumes the
-         * same conversation exactly where it left off.
+         * The ticket and its history in the backend are untouched (see
+         * ProcessInactiveChatTicketsCommand for the separate, much longer backend
+         * inactivity policy) — but the server-side session IS revoked here (POST
+         * /chat/keluar), not just client-side state cleared. Without that, reopening
+         * the widget on the same (possibly shared/public) computer would silently
+         * auto-resume the previous citizen's chat via the session cookie alone.
+         * Typing the same phone number back in (with a fresh captcha) resumes the
+         * same conversation from scratch.
          */
         resetToPhoneEntry() {
             clearInterval(this.idleWatchTimer);
@@ -278,8 +303,8 @@ window.chatWidget = function chatWidget() {
             this.ratingComment = '';
             this.phone = '';
             this.step = 'phone';
-            localStorage.removeItem(STORAGE_PHONE);
-            localStorage.removeItem(STORAGE_TICKET);
+            this.refreshCaptcha();
+            window.axios.post('/chat/keluar').catch(() => {});
         },
 
         ctaFor(action) {

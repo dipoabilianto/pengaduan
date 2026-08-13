@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Models\ChatTicket;
 use App\Models\Report;
+use App\Models\ReportReporter;
 use App\Services\AiHealthService;
 use App\Services\BrandingSettingsService;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -34,6 +35,14 @@ class AppServiceProvider extends ServiceProvider
             $ticket = $request->route('chatTicket');
 
             return Limit::perMinute(12)->by($ticket?->id ?? $request->ip());
+        });
+
+        // A phone number is otherwise sufficient by itself to reach a citizen's chat
+        // (see ChatController::start()'s docblock) — this limits how many /chat/mulai
+        // attempts a single phone number can absorb, independent of the route's own
+        // per-IP throttle, so hammering one known/guessed number is bounded too.
+        RateLimiter::for('chat-start-phone', function (Request $request) {
+            return Limit::perMinutes(10, 5)->by(ReportReporter::hashPhone((string) $request->input('phone')));
         });
 
         View::composer('layouts.sidebar', function ($view) {

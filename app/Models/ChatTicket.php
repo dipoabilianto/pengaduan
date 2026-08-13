@@ -50,26 +50,35 @@ class ChatTicket extends Model
     }
 
     /**
-     * One ticket per phone number, forever — reuses ReportReporter's exact blind-index
-     * algorithm (same HMAC key) so the two indexes never diverge.
+     * A phone number keeps its currently-active (non-selesai) ticket, but a closed
+     * ticket is never reused for a new conversation — a fresh one is started instead,
+     * with its own channel_token. Reuses ReportReporter's exact blind-index algorithm
+     * (same HMAC key) so the two indexes never diverge.
      */
     public static function findOrStartFor(string $phone): self
     {
         $hash = ReportReporter::hashPhone($phone);
 
-        $ticket = static::firstOrNew(['phone_hash' => $hash]);
+        $active = static::where('phone_hash', $hash)
+            ->where('status', '!=', self::STATUS_SELESAI)
+            ->latest('id')
+            ->first();
 
-        if (! $ticket->exists) {
-            // Set explicitly rather than relying on the DB column default — an
-            // insert only sends the attributes actually assigned here, and the
-            // in-memory model would otherwise read back null (not the DB's
-            // true default) until a separate refresh().
-            $ticket->phone_enc = $phone;
-            $ticket->channel_token = Str::random(64);
-            $ticket->status = self::STATUS_MENUNGGU;
-            $ticket->ai_enabled = true;
-            $ticket->save();
+        if ($active) {
+            return $active;
         }
+
+        $ticket = new static();
+        // Set explicitly rather than relying on the DB column default — an
+        // insert only sends the attributes actually assigned here, and the
+        // in-memory model would otherwise read back null (not the DB's
+        // true default) until a separate refresh().
+        $ticket->phone_hash = $hash;
+        $ticket->phone_enc = $phone;
+        $ticket->channel_token = Str::random(64);
+        $ticket->status = self::STATUS_MENUNGGU;
+        $ticket->ai_enabled = true;
+        $ticket->save();
 
         return $ticket;
     }

@@ -26,6 +26,18 @@
                 <input type="tel" x-model="phone" placeholder="08xxxxxxxxxx"
                        @keydown.enter="startChat()"
                        class="w-full rounded-md border-gray-300 text-sm text-gray-900 focus:border-sky-500 focus:ring-sky-500">
+                <div class="flex items-center gap-2">
+                    <div class="flex h-9 min-w-[110px] items-center justify-center rounded-md border border-gray-200 bg-gray-50 px-3">
+                        <span class="font-mono text-lg font-bold tracking-[0.3em] text-gray-800" x-text="captchaCode || '…'"></span>
+                    </div>
+                    <button type="button" @click="refreshCaptcha()" title="Ganti Kode"
+                            class="rounded-md border border-gray-200 px-2 py-1.5 text-xs text-gray-500 hover:bg-gray-50">
+                        &#8635;
+                    </button>
+                </div>
+                <input type="text" x-model="captcha" placeholder="Ketik ulang kode di atas" maxlength="5"
+                       @keydown.enter="startChat()"
+                       class="w-full rounded-md border-gray-300 text-sm uppercase tracking-widest text-gray-900 focus:border-sky-500 focus:ring-sky-500">
                 <p x-show="error" x-cloak x-text="error" class="text-xs text-rose-600"></p>
                 <button type="button" @click="startChat()" :disabled="starting"
                         class="rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-500 disabled:opacity-60">

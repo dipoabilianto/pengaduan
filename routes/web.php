@@ -45,14 +45,20 @@ Route::prefix('cek-status')->name('public.status.')->group(function () {
 });
 
 Route::prefix('chat')->name('chat.')->group(function () {
-    // Bukan cuma "mulai chat baru" — dipanggil otomatis (chat-widget.js: init() -> resume())
-    // di SETIAP halaman publik yang dimuat (widget-nya ada di layout situs-wide), bukan cuma
-    // sekali per sesi. throttle:5,1 dulu bikin 429 muncul cuma dari navigasi normal beberapa
-    // halaman dalam 1 menit; disamakan dengan chat.send yang memang aksi berulang serupa.
-    Route::post('/mulai', [ChatController::class, 'start'])->middleware('throttle:30,1')->name('start');
+    // Only called when actually starting/resuming via a typed phone number (new
+    // ticket, or no active server session) — see chat-widget.js's startChat()/
+    // revealHistory(). Gated by CAPTCHA + a per-phone-number rate limit
+    // ('chat-start-phone') on top of this IP-based one, since a phone number alone
+    // is otherwise sufficient to reach a citizen's chat.
+    Route::post('/mulai', [ChatController::class, 'start'])->middleware(['throttle:30,1', 'throttle:chat-start-phone'])->name('start');
     Route::post('/{chatTicket}/pesan', [ChatController::class, 'sendMessage'])->middleware(['throttle:20,1', 'throttle:chat-message'])->name('send');
     Route::post('/{chatTicket}/nilai', [ChatController::class, 'rate'])->middleware('throttle:10,1')->name('rate');
     Route::post('/broadcasting/auth', [ChatBroadcastAuthController::class, 'authenticate'])->middleware('throttle:30,1')->name('broadcasting-auth');
+    // Called automatically on every public page load (chat-widget.js: init()) — resumes
+    // an already-open conversation purely from the HttpOnly session cookie, no phone
+    // number involved, so the widget no longer needs to cache/replay one from localStorage.
+    Route::get('/sesi', [ChatController::class, 'session'])->middleware('throttle:30,1')->name('session');
+    Route::post('/keluar', [ChatController::class, 'endSession'])->middleware('throttle:30,1')->name('end-session');
 });
 
 Route::get('/dashboard', DashboardController::class)->middleware(['auth', 'verified'])->name('dashboard');

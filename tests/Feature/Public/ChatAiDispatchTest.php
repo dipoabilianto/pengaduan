@@ -8,11 +8,23 @@ use App\Models\User;
 use App\Services\AiSettingsService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
 class ChatAiDispatchTest extends TestCase
 {
     use RefreshDatabase;
+
+    /**
+     * /chat/mulai requires a solved CAPTCHA (see StartChatRequest) — same helper as
+     * ChatTest.
+     */
+    private function startChat(string $phone, array $extra = []): TestResponse
+    {
+        $code = $this->getJson(route('captcha'))->json('code');
+
+        return $this->postJson(route('chat.start'), array_merge(['phone' => $phone, 'captcha' => $code], $extra));
+    }
 
     private function configureAi(): void
     {
@@ -26,7 +38,7 @@ class ChatAiDispatchTest extends TestCase
     {
         Queue::fake();
         $this->configureAi();
-        $this->postJson(route('chat.start'), ['phone' => '081234567890']);
+        $this->startChat('081234567890');
         $ticket = ChatTicket::first();
 
         $this->postJson(route('chat.send', $ticket), ['message' => 'Jam buka kantor jam berapa?']);
@@ -37,7 +49,7 @@ class ChatAiDispatchTest extends TestCase
     public function test_sending_a_message_does_not_dispatch_when_ai_is_not_configured(): void
     {
         Queue::fake();
-        $this->postJson(route('chat.start'), ['phone' => '081234567890']);
+        $this->startChat('081234567890');
         $ticket = ChatTicket::first();
 
         $this->postJson(route('chat.send', $ticket), ['message' => 'Jam buka kantor jam berapa?']);
@@ -49,7 +61,7 @@ class ChatAiDispatchTest extends TestCase
     {
         Queue::fake();
         $this->configureAi();
-        $this->postJson(route('chat.start'), ['phone' => '081234567890']);
+        $this->startChat('081234567890');
         $ticket = ChatTicket::first();
         $ticket->update(['ai_enabled' => false]);
 

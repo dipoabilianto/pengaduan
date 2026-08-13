@@ -2,6 +2,7 @@
 
 namespace Tests\Unit\Models;
 
+use App\Models\ChatMessage;
 use App\Models\ChatTicket;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
@@ -11,13 +12,56 @@ class ChatTicketTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_same_phone_number_reuses_the_same_ticket(): void
+    public function test_same_phone_number_reuses_the_same_ticket_while_it_is_still_active(): void
     {
         $first = ChatTicket::findOrStartFor('081234567890');
         $second = ChatTicket::findOrStartFor('081234567890');
 
         $this->assertSame($first->id, $second->id);
         $this->assertSame(1, ChatTicket::count());
+    }
+
+    /**
+     * A closed ticket is never silently reused for a new conversation — a phone
+     * number can have multiple tickets over time (one per "life" of a conversation),
+     * unlike the old forever-bound-to-one-ticket behavior.
+     */
+    public function test_same_phone_number_gets_a_new_ticket_once_the_previous_one_is_closed(): void
+    {
+        $first = ChatTicket::findOrStartFor('081234567890');
+        $first->update(['status' => ChatTicket::STATUS_SELESAI, 'closed_at' => now()]);
+
+        $second = ChatTicket::findOrStartFor('081234567890');
+
+        $this->assertNotSame($first->id, $second->id);
+        $this->assertNotSame($first->channel_token, $second->channel_token);
+        $this->assertSame(ChatTicket::STATUS_MENUNGGU, $second->status);
+        $this->assertSame(2, ChatTicket::count());
+    }
+
+    public function test_messages_of_two_tickets_for_the_same_phone_number_do_not_mix(): void
+    {
+        $first = ChatTicket::findOrStartFor('081234567890');
+        $first->update(['status' => ChatTicket::STATUS_SELESAI, 'closed_at' => now()]);
+        ChatMessage::create([
+            'chat_ticket_id' => $first->id,
+            'sender_type' => ChatMessage::SENDER_CITIZEN,
+            'body' => 'Pesan di ticket pertama',
+            'created_at' => now(),
+        ]);
+
+        $second = ChatTicket::findOrStartFor('081234567890');
+        ChatMessage::create([
+            'chat_ticket_id' => $second->id,
+            'sender_type' => ChatMessage::SENDER_CITIZEN,
+            'body' => 'Pesan di ticket kedua',
+            'created_at' => now(),
+        ]);
+
+        $this->assertCount(1, $first->messages);
+        $this->assertCount(1, $second->messages);
+        $this->assertSame('Pesan di ticket pertama', $first->messages->first()->body);
+        $this->assertSame('Pesan di ticket kedua', $second->messages->first()->body);
     }
 
     /**

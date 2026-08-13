@@ -38,9 +38,11 @@ class ChatController extends Controller
     }
 
     /**
-     * One ticket per phone number, forever (ChatTicket::findOrStartFor) — resumes
-     * the citizen's existing thread if they've chatted before, from any device,
-     * as long as they enter the same phone number again.
+     * Resumes the citizen's currently-active thread for this phone number if one
+     * exists, otherwise starts a fresh ticket (ChatTicket::findOrStartFor) — a closed
+     * ticket is never silently reused. Gated by a CAPTCHA (StartChatRequest) and a
+     * per-phone rate limit (see the 'chat-start-phone' limiter) since a phone number
+     * alone is otherwise sufficient to reach a citizen's chat.
      */
     public function start(StartChatRequest $request): JsonResponse
     {
@@ -62,6 +64,9 @@ class ChatController extends Controller
         }
 
         $request->session()->put('chat_token_'.$ticket->id, $ticket->channel_token);
+        $request->session()->put('active_chat_ticket_id', $ticket->id);
+        // A solved code can't be replayed against another phone number.
+        $request->session()->forget('captcha');
 
         [$messages, $historyHidden] = $this->visibleMessagesFor($ticket, $request);
 
@@ -72,6 +77,49 @@ class ChatController extends Controller
             'messages' => $messages,
             'awaiting_rating' => $this->awaitingRating($ticket),
         ]);
+    }
+
+    /**
+     * Lets the widget resume an already-open conversation using only the HttpOnly
+     * session cookie — no phone number involved — so init() no longer needs to cache
+     * and silently replay the phone number from localStorage to "remember" the chat.
+     */
+    public function session(Request $request): JsonResponse
+    {
+        $ticketId = $request->session()->get('active_chat_ticket_id');
+        $ticket = $ticketId ? ChatTicket::find($ticketId) : null;
+        $token = $ticket ? $request->session()->get('chat_token_'.$ticket->id) : null;
+
+        if (! $ticket || ! $token || ! hash_equals($ticket->channel_token, $token)) {
+            return response()->json(['active' => false]);
+        }
+
+        [$messages, $historyHidden] = $this->visibleMessagesFor($ticket, $request);
+
+        return response()->json([
+            'active' => true,
+            'ticket_id' => $ticket->id,
+            'status' => $ticket->status,
+            'history_hidden' => $historyHidden,
+            'messages' => $messages,
+            'awaiting_rating' => $this->awaitingRating($ticket),
+        ]);
+    }
+
+    /**
+     * Companion to session() — the widget's idle-privacy reset (shared/public computer
+     * affordance) calls this so it actually revokes server-side access instead of only
+     * clearing client-side state nothing reads for authorization anymore.
+     */
+    public function endSession(Request $request): JsonResponse
+    {
+        $ticketId = $request->session()->pull('active_chat_ticket_id');
+
+        if ($ticketId) {
+            $request->session()->forget('chat_token_'.$ticketId);
+        }
+
+        return response()->json(['status' => 'ok']);
     }
 
     /**
