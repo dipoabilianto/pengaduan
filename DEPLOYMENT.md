@@ -30,8 +30,17 @@ kustom ke publik. Dua konsekuensi arsitektur dari batasan itu:
 ## 2. Struktur Direktori di cPanel
 
 Document root domain **harus** mengarah ke folder `public/` proyek, bukan root proyek —
-kalau tidak, `.env` dan kode aplikasi jadi bisa diakses langsung lewat browser. Dua cara umum:
+kalau tidak, `.env` dan kode aplikasi jadi bisa diakses langsung lewat browser. Tiga cara:
 
+- **Paling mudah — symlink `public_html` ke folder `public/` proyek** (SSH):
+  ```bash
+  cd ~
+  mv public_html public_html.bak        # cadangkan dulu isi bawaan cPanel
+  ln -s /home/USER/sidumas/public public_html
+  ```
+  Tidak perlu edit `index.php` apa pun — `__DIR__.'/..'` di `public/index.php` menembus
+  symlink dan tetap menunjuk ke `~/sidumas`. Kalau panel protes, balikkan dengan
+  `rm public_html && mv public_html.bak public_html`, lalu pakai cara kedua/ketiga.
 - **Kalau cPanel mengizinkan ubah document root** (Domains → Manage → Document Root): arahkan
   langsung ke `namadomain.com/public`.
 - **Kalau tidak bisa** (banyak paket shared/cloud hosting): taruh proyek di luar
