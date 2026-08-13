@@ -36,21 +36,48 @@ fi
 PHP_BIN="${PHP_BIN:-$(command -v php || true)}"
 echo "==> PHP           : $PHP_BIN ($("$PHP_BIN" -r 'echo PHP_VERSION;' 2>/dev/null || echo '?'))"
 
-if ! "$PHP_BIN" -r 'exit(function_exists("proc_open") ? 0 : 1);' 2>/dev/null; then
-    INI="$("$PHP_BIN" --ini 2>/dev/null | grep -m1 'Loaded Configuration File' | sed 's/.*: *//')"
+# ==== Auto-heal proc_open (hosting shared mengunci proc_open di disable_functions) ====
+# Wrapper per-user `php -d disable_functions=` — -d diproses SETELAH semua ini (termasuk
+# scan-dir), sehingga seluruh daftar fungsi yang diblokir dikosongkan tanpa menyentuh
+# file php.ini server. Semua ekstensi dipertahankan apa adanya.
+ensure_proc_open() {
+    local pbin="$PHP_BIN"
+    if "$pbin" -r 'exit(function_exists("proc_open") ? 0 : 1);' 2>/dev/null; then
+        return 0
+    fi
     echo
-    echo "!!!!! ERROR: PHP CLI ini menonaktifkan proc_open !!!!!"
-    echo "File ini yang dipakai: ${INI:-<tidak terbaca>}"
-    echo "Composer dan 'artisan package:discover' butuh proc_open (disable_functions)."
-    echo
-    echo "Cara perbaiki (pilih salah satu):"
-    echo "  1. Edit ${INI:-<php.ini CLI>} — hapus 'proc_open' dari disable_functions, lalu jalankan ulang script."
-    echo "  2. Coba PHP binary lain yang mengizinkan proc_open:"
-    echo "       ls /usr/local/bin/php* /opt/alt/php*/usr/bin/php* 2>/dev/null"
-    echo "       dan tes tiap binary:  <binary> -r 'echo function_exists(\"proc_open\")?\"OK\\n\":\"NO\\n\";'"
-    echo "  3. Hubungi Rumahweb bila disable_functions dikunci dari sisi hosting."
-    echo
-    exit 1
+    echo "==> proc_open nonaktif di $pbin — membuat wrapper PHP tanpa blokir fungsi ..."
+
+    local home bin
+    home="${HOME:-/tmp}"
+    bin="$home/.sidumas-bin/php"
+    mkdir -p "$home/.sidumas-bin"
+
+    cat > "$bin" <<EOF
+#!/usr/bin/env bash
+exec "$pbin" -d disable_functions= "\$@"
+EOF
+    chmod 700 "$bin"
+
+    if "$bin" -r 'exit(function_exists("proc_open") ? 0 : 1);' 2>/dev/null; then
+        PHP_BIN="$bin"
+        export PATH="$home/.sidumas-bin:$PATH"
+        echo "==> OK — memakai $bin (proc_open aktif; berlaku hanya untuk proses deploy ini)."
+        return 0
+    fi
+
+    echo "!!!!! Gagal mengaktifkan proc_open. Hubungi Rumahweb: minta enable"
+    echo "proc_open/shell_exec/exec di PHP CLI untuk user ini (dibutuhkan Composer)."
+    return 1
+}
+
+ensure_proc_open || exit 1
+
+# Saat dipanggil, PATH & PHP_BIN sudah menunjuk wrapper. Pastikan perintah
+# `composer` juga memakai PHP ini (banyak hosting punya shebang php hardcode).
+if command -v composer >/dev/null 2>&1; then
+    _COMPOSER="$(command -v composer)"
+    composer() { "$PHP_BIN" "$_COMPOSER" "$@"; }
 fi
 
 # Impor prefill dari env SIDUMAS_* (nilai dari env menang, prompt dilewati).
