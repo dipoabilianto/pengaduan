@@ -246,7 +246,7 @@ echo "==> migrate + storage:link"
 
 echo
 echo "==> seed role/permission (tanpa user uji-coba)"
-"$PHP_BIN" artisan db:seed --class=RolesTableSeeder
+"$PHP_BIN" artisan db:seed --class=RolesTableSeeder --force
 
 echo
 echo "==> buat akun admin superuser"
