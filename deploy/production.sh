@@ -33,6 +33,23 @@ command -v php >/dev/null || { echo "ERROR: PHP tidak ditemukan di PATH."; exit 
 PHP_BIN="$(command -v php || true)"
 echo "==> PHP           : $PHP_BIN ($("$PHP_BIN" -r 'echo PHP_VERSION;' 2>/dev/null || echo '?'))"
 
+if ! "$PHP_BIN" -r 'exit(function_exists("proc_open") ? 0 : 1);' 2>/dev/null; then
+    INI="$("$PHP_BIN" --ini 2>/dev/null | grep -m1 'Loaded Configuration File' | sed 's/.*: *//')"
+    echo
+    echo "!!!!! ERROR: PHP CLI ini menonaktifkan proc_open !!!!!"
+    echo "File ini yang dipakai: ${INI:-<tidak terbaca>}"
+    echo "Composer dan 'artisan package:discover' butuh proc_open (disable_functions)."
+    echo
+    echo "Cara perbaiki (pilih salah satu):"
+    echo "  1. Edit ${INI:-<php.ini CLI>} — hapus 'proc_open' dari disable_functions, lalu jalankan ulang script."
+    echo "  2. Coba PHP binary lain yang mengizinkan proc_open:"
+    echo "       ls /usr/local/bin/php* /opt/alt/php*/usr/bin/php* 2>/dev/null"
+    echo "       dan tes tiap binary:  <binary> -r 'echo function_exists(\"proc_open\")?\"OK\\n\":\"NO\\n\";'"
+    echo "  3. Hubungi Rumahweb bila disable_functions dikunci dari sisi hosting."
+    echo
+    exit 1
+fi
+
 # Impor prefill dari env SIDUMAS_* (nilai dari env menang, prompt dilewati).
 for suffix in DOMAIN DB_DATABASE DB_USERNAME DB_PASSWORD \
               PUSHER_APP_ID PUSHER_APP_KEY PUSHER_APP_SECRET PUSHER_APP_CLUSTER \
