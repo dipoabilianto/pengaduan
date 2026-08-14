@@ -115,27 +115,6 @@ class ChatTicketTest extends TestCase
         $this->assertNotEmpty($ticket->channel_token);
     }
 
-    public function test_a_closed_ticket_reopens_on_new_activity(): void
-    {
-        $ticket = ChatTicket::findOrStartFor('081234567890');
-        $ticket->update(['status' => ChatTicket::STATUS_SELESAI, 'closed_at' => now()]);
-
-        $ticket->reopen();
-
-        $this->assertSame(ChatTicket::STATUS_MENUNGGU, $ticket->fresh()->status);
-        $this->assertNull($ticket->fresh()->closed_at);
-    }
-
-    public function test_reopen_is_a_no_op_when_not_closed(): void
-    {
-        $ticket = ChatTicket::findOrStartFor('081234567890');
-        $ticket->update(['status' => ChatTicket::STATUS_DITANGANI]);
-
-        $ticket->reopen();
-
-        $this->assertSame(ChatTicket::STATUS_DITANGANI, $ticket->fresh()->status);
-    }
-
     public function test_phone_is_encrypted_at_rest_but_hash_is_queryable(): void
     {
         $ticket = ChatTicket::findOrStartFor('081234567890');

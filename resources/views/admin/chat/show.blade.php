@@ -111,12 +111,14 @@
                 </p>
 
                 @if ($canReply)
-                    <form method="POST" action="{{ route('admin.chat.send', $ticket) }}" class="border-t border-gray-200 p-3"
+                    <form @submit.prevent="send()" class="border-t border-gray-200 p-3"
                           x-data="{
                               draft: {{ Js::from(old('message', '')) }},
                               rawDraft: null,
                               polishing: false,
                               polishError: null,
+                              sending: false,
+                              sendError: null,
                               polish() {
                                   if (! this.draft.trim() || this.polishing) return;
                                   this.polishing = true;
@@ -132,10 +134,30 @@
                                       })
                                       .finally(() => { this.polishing = false; });
                               },
+                              // AJAX instead of a plain form POST — that used to reload the
+                              // whole page on every reply, which reset #chat-thread's own
+                              // scroll position back to the top each time (not just the
+                              // page). The new bubble itself is appended by the existing
+                              // '.message.sent' broadcast listener (admin-chat.js), which
+                              // already scrolls the thread to the bottom afterward.
+                              send() {
+                                  if (! this.draft.trim() || this.sending) return;
+                                  this.sending = true;
+                                  this.sendError = null;
+                                  axios.post('{{ route('admin.chat.send', $ticket) }}', { message: this.draft, raw_draft: this.rawDraft })
+                                      .then(() => {
+                                          this.draft = '';
+                                          this.rawDraft = null;
+                                      })
+                                      .catch((err) => {
+                                          this.sendError = err.response?.data?.errors?.message?.[0] ?? 'Gagal mengirim balasan.';
+                                      })
+                                      .finally(() => { this.sending = false; });
+                              },
                           }">
                         @csrf
                         <div class="flex items-center gap-2">
-                            <input type="text" id="chat-composer-input" name="message" x-model="draft" required maxlength="2000" placeholder="Tulis balasan..."
+                            <input type="text" id="chat-composer-input" x-model="draft" required maxlength="2000" placeholder="Tulis balasan..."
                                    class="flex-1 rounded-md border-gray-300 text-sm focus:border-sky-500 focus:ring-sky-500">
                             @if ($isAiConfigured)
                                 <button type="button" @click="polish()" :disabled="polishing"
@@ -147,11 +169,12 @@
                                     <span x-text="polishing ? 'Merapikan… (bisa sampai 20 detik)' : 'Haluskan dengan AI'">Haluskan dengan AI</span>
                                 </button>
                             @endif
-                            <input type="hidden" name="raw_draft" x-model="rawDraft">
-                            <button type="submit" class="shrink-0 rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-500">Kirim</button>
+                            <button type="submit" :disabled="sending" class="shrink-0 rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-500 disabled:opacity-60">
+                                <span x-text="sending ? 'Mengirim...' : 'Kirim'">Kirim</span>
+                            </button>
                         </div>
                         <p x-show="polishError" x-cloak x-text="polishError" class="mt-1 text-xs text-rose-600"></p>
-                        @error('message')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
+                        <p x-show="sendError" x-cloak x-text="sendError" class="mt-1 text-xs text-rose-600"></p>
                     </form>
                 @endif
             </div>

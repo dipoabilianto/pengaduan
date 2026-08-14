@@ -124,15 +124,23 @@ class ChatTest extends TestCase
         $this->assertNotSame($otherTicket->channel_token, session('chat_token_'.$ownTicket->id));
     }
 
-    public function test_sending_a_message_reopens_a_closed_ticket(): void
+    /**
+     * A closed ticket is a dead end from the citizen's side — no longer silently
+     * reopened by continuing to message it (that used to happen automatically). The
+     * widget directs them to start a fresh chat instead (see ChatController::sendMessage
+     * docblock).
+     */
+    public function test_sending_a_message_to_a_closed_ticket_is_rejected(): void
     {
         $this->startChat('081234567890');
         $ticket = ChatTicket::first();
         $ticket->update(['status' => ChatTicket::STATUS_SELESAI, 'closed_at' => now()]);
 
-        $this->postJson(route('chat.send', $ticket), ['message' => 'Masih ada pertanyaan lagi.']);
+        $response = $this->postJson(route('chat.send', $ticket), ['message' => 'Masih ada pertanyaan lagi.']);
 
-        $this->assertSame(ChatTicket::STATUS_MENUNGGU, $ticket->fresh()->status);
+        $response->assertStatus(422);
+        $this->assertSame(ChatTicket::STATUS_SELESAI, $ticket->fresh()->status);
+        $this->assertSame(0, ChatMessage::where('sender_type', ChatMessage::SENDER_CITIZEN)->count());
     }
 
     public function test_sending_a_message_records_citizen_activity_timestamp(): void

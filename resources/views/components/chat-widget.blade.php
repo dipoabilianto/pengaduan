@@ -94,7 +94,13 @@
             <p x-show="ratingSubmitted" x-cloak class="border-t border-gray-100 bg-gray-50 px-3 py-2 text-center text-xs text-emerald-600">
                 Terima kasih atas penilaian Anda! 🙏
             </p>
-            <form @submit.prevent="send()" class="flex items-center gap-2 border-t border-gray-200 p-2">
+            <div x-show="ticketStatus === 'selesai'" x-cloak class="border-t border-gray-200 bg-gray-50 p-3 text-center">
+                <p class="text-xs text-gray-500">Chat ini sudah selesai.</p>
+                <button type="button" @click="resetToPhoneEntry()" class="mt-2 rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-500">
+                    Mulai Chat Baru
+                </button>
+            </div>
+            <form x-show="ticketStatus !== 'selesai'" @submit.prevent="send()" class="flex items-center gap-2 border-t border-gray-200 p-2">
                 <input type="text" x-model="draft" @input="notifyTyping()" placeholder="Tulis pesan..."
                        class="flex-1 rounded-md border-gray-300 text-sm text-gray-900 focus:border-sky-500 focus:ring-sky-500">
                 <button type="submit" :disabled="sending"

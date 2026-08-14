@@ -107,7 +107,13 @@ class ChatTicketController extends Controller
         return back()->with('status', 'Tiket diambil alih.');
     }
 
-    public function sendMessage(SendOfficerChatMessageRequest $request, ChatTicket $chatTicket): RedirectResponse
+    /**
+     * JSON branch (AJAX submit from show.blade.php) avoids the full-page reload the
+     * plain form POST used to cause — that reload was resetting #chat-thread's scroll
+     * position to the top on every reply, not just landing the officer back at the
+     * page top. The redirect branch stays for graceful degradation (JS disabled).
+     */
+    public function sendMessage(SendOfficerChatMessageRequest $request, ChatTicket $chatTicket): RedirectResponse|JsonResponse
     {
         try {
             $this->chatAdmin->sendMessage(
@@ -117,7 +123,15 @@ class ChatTicketController extends Controller
                 $request->validated('raw_draft'),
             );
         } catch (InvalidArgumentException $e) {
+            if ($request->expectsJson()) {
+                return response()->json(['message' => $e->getMessage(), 'errors' => ['message' => [$e->getMessage()]]], 422);
+            }
+
             return back()->withErrors(['message' => $e->getMessage()])->withInput();
+        }
+
+        if ($request->expectsJson()) {
+            return response()->json(['status' => 'ok']);
         }
 
         return back()->with('status', 'Balasan terkirim.');

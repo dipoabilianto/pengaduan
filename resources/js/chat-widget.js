@@ -59,6 +59,7 @@ window.chatWidget = function chatWidget() {
         recaptchaWidgetId: null,
         pendingTicketNo: null,
         ticketId: null,
+        ticketStatus: null,
         messages: [],
         draft: '',
         sending: false,
@@ -182,6 +183,7 @@ window.chatWidget = function chatWidget() {
 
         enterTicket(data) {
             this.ticketId = data.ticket_id;
+            this.ticketStatus = data.status;
             this.messages = data.messages;
             this.historyHidden = !! data.history_hidden;
             this.awaitingRating = !! data.awaiting_rating;
@@ -273,6 +275,7 @@ window.chatWidget = function chatWidget() {
                 // auto-close, officer's "Tandai Selesai") marks the ticket selesai — lets
                 // the rating card appear live without the citizen needing to reload.
                 .listen('.ticket.closed', () => {
+                    this.ticketStatus = 'selesai';
                     if (! this.ratingSubmitted) {
                         this.awaitingRating = true;
                     }
@@ -327,10 +330,16 @@ window.chatWidget = function chatWidget() {
 
             window.axios.post(`/chat/${this.ticketId}/pesan`, { message: body })
                 .then(() => { this.lastCitizenActivityAt = Date.now(); })
-                .catch(() => {
-                    this.error = 'Pesan gagal terkirim. Coba lagi.';
+                .catch((err) => {
+                    // 422 here means the ticket got closed between the widget loading and
+                    // this send (e.g. an officer closed it, or the reveal-history window
+                    // lapsed) — ticketStatus wasn't updated yet to have hidden the form.
+                    this.error = err.response?.data?.errors?.message?.[0] ?? 'Pesan gagal terkirim. Coba lagi.';
                     this.messages = this.messages.filter((m) => m.id !== tempId);
                     this.draft = body;
+                    if (err.response?.status === 422 && err.response?.data?.errors?.message) {
+                        this.ticketStatus = 'selesai';
+                    }
                 })
                 .finally(() => { this.sending = false; });
         },
@@ -366,6 +375,7 @@ window.chatWidget = function chatWidget() {
             }
             this.messages = [];
             this.ticketId = null;
+            this.ticketStatus = null;
             this.historyHidden = false;
             this.awaitingRating = false;
             this.ratingSubmitted = false;

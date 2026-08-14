@@ -113,20 +113,6 @@ class ChatTicket extends Model
         return $this->status === self::STATUS_SELESAI;
     }
 
-    /**
-     * A closed ticket isn't a dead end — a citizen message always reopens it, since
-     * "selesai" here just means "nothing pending", not a hard state-machine terminus
-     * like Report's Selesai/Ditolak.
-     */
-    public function reopen(): void
-    {
-        if ($this->isClosed()) {
-            // nudge_count resets too — a citizen reopening after being fully idle starts
-            // a fresh inactivity cycle, not a continuation of the old one's nudge budget.
-            $this->update(['status' => self::STATUS_MENUNGGU, 'closed_at' => null, 'nudge_count' => 0]);
-        }
-    }
-
     public function recordIncoming(string $preview): void
     {
         // Str::limit()'s $limit is the length BEFORE it appends "..." — a preview that

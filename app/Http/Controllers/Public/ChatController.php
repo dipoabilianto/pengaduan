@@ -197,9 +197,22 @@ class ChatController extends Controller
         return response()->json(['status' => 'ok']);
     }
 
+    /**
+     * A closed ticket is a dead end by design — no longer silently reopened by the
+     * citizen sending another message (that used to happen automatically). A closed
+     * conversation may be stale/already resolved from the office's side; continuing it
+     * invisibly could land a new question on an officer who's moved on. The widget
+     * directs the citizen to start a fresh chat instead (see chat-widget.js's
+     * ticketStatus handling).
+     */
     public function sendMessage(SendChatMessageRequest $request, ChatTicket $chatTicket): JsonResponse
     {
-        $chatTicket->reopen();
+        if ($chatTicket->isClosed()) {
+            return response()->json([
+                'message' => 'Chat ini sudah selesai. Mulai chat baru untuk melanjutkan.',
+                'errors' => ['message' => ['Chat ini sudah selesai. Mulai chat baru untuk melanjutkan.']],
+            ], 422);
+        }
 
         $message = ChatMessage::create([
             'chat_ticket_id' => $chatTicket->id,
