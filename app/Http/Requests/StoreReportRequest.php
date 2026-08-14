@@ -3,9 +3,9 @@
 namespace App\Http\Requests;
 
 use App\Models\Report;
+use App\Rules\RecaptchaV2;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\Validator;
 
 class StoreReportRequest extends FormRequest
 {
@@ -34,19 +34,8 @@ class StoreReportRequest extends FormRequest
             'why' => ['nullable', 'string'],
             'attachments' => ['nullable', 'array', 'max:5'],
             'attachments.*' => ['file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
-            'captcha' => ['required', 'string'],
+            'g-recaptcha-response' => ['required', 'string', new RecaptchaV2],
         ];
-    }
-
-    public function withValidator(Validator $validator): void
-    {
-        $validator->after(function (Validator $validator) {
-            $expected = session('captcha');
-
-            if (! $expected || strtoupper(trim((string) $this->input('captcha'))) !== $expected) {
-                $validator->errors()->add('captcha', 'Kode verifikasi tidak sesuai.');
-            }
-        });
     }
 
     public function messages(): array
@@ -57,7 +46,7 @@ class StoreReportRequest extends FormRequest
             'category.in' => 'Kategori tidak sesuai dengan jenis pelaporan yang dipilih.',
             'phone.required' => 'Nomor HP/WhatsApp wajib diisi sebagai identitas pelaporan (PK).',
             'what.required' => 'Uraian kejadian (What) wajib diisi.',
-            'captcha.required' => 'Kode verifikasi wajib diisi.',
+            'g-recaptcha-response.required' => 'Verifikasi captcha wajib diisi.',
         ];
     }
 }

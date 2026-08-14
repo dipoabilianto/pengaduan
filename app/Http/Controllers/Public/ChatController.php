@@ -65,8 +65,6 @@ class ChatController extends Controller
 
         $request->session()->put('chat_token_'.$ticket->id, $ticket->channel_token);
         $request->session()->put('active_chat_ticket_id', $ticket->id);
-        // A solved code can't be replayed against another phone number.
-        $request->session()->forget('captcha');
 
         [$messages, $historyHidden] = $this->visibleMessagesFor($ticket, $request);
 

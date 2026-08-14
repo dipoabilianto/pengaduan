@@ -2,8 +2,8 @@
 
 namespace App\Http\Requests;
 
+use App\Rules\RecaptchaV2;
 use Illuminate\Foundation\Http\FormRequest;
-use Illuminate\Validation\Validator;
 
 class StartChatRequest extends FormRequest
 {
@@ -14,7 +14,9 @@ class StartChatRequest extends FormRequest
 
     /**
      * Same shape as StoreReportRequest's phone rule — no regex, just length bounds,
-     * matching the existing public-facing phone input convention.
+     * matching the existing public-facing phone input convention. The recaptcha rule
+     * blocks automated/bulk phone-number guessing (a phone number alone is otherwise
+     * sufficient to reach a citizen's chat — see ChatController::start()'s docblock).
      */
     public function rules(): array
     {
@@ -24,30 +26,15 @@ class StartChatRequest extends FormRequest
             // Sent by the widget's "Lihat Riwayat Chat Sebelumnya" button to force full
             // history even inside the 6-12h hidden window — see ChatController::start().
             'reveal_history' => ['nullable', 'boolean'],
-            'captcha' => ['required', 'string'],
+            'g-recaptcha-response' => ['required', 'string', new RecaptchaV2],
         ];
-    }
-
-    /**
-     * Same session-comparison pattern as StoreReportRequest — a phone number alone is
-     * otherwise sufficient to reach a citizen's chat (see ChatController::start()'s
-     * docblock), so this blocks automated/bulk guessing across many numbers.
-     */
-    public function withValidator(Validator $validator): void
-    {
-        $validator->after(function (Validator $validator) {
-            $expected = session('captcha');
-
-            if (! $expected || strtoupper(trim((string) $this->input('captcha'))) !== $expected) {
-                $validator->errors()->add('captcha', 'Kode verifikasi tidak sesuai.');
-            }
-        });
     }
 
     public function messages(): array
     {
         return [
-            'captcha.required' => 'Kode verifikasi wajib diisi.',
+            'phone.required' => 'Nomor HP wajib diisi.',
+            'g-recaptcha-response.required' => 'Verifikasi captcha wajib diisi.',
         ];
     }
 }

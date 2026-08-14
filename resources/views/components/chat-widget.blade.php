@@ -6,7 +6,7 @@
 --}}
 <div x-data="chatWidget()" x-cloak class="fixed bottom-5 right-5 z-50">
     <div x-show="open" x-transition x-cloak
-         class="mb-3 flex h-[28rem] w-80 flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl">
+         class="fixed inset-0 z-50 flex h-full w-full flex-col overflow-hidden bg-white sm:static sm:z-auto sm:mb-3 sm:h-[28rem] sm:w-80 sm:flex-none sm:rounded-2xl sm:border sm:border-gray-200 sm:shadow-2xl">
         <div class="flex items-center justify-between bg-sky-600 px-4 py-3 text-white">
             <div class="flex items-center gap-2">
                 <img src="{{ asset('images/maskot-ulp.png') }}" alt="Maskot ULP" class="h-10 w-8 shrink-0 rounded-md object-cover object-top">
@@ -20,31 +20,21 @@
             </button>
         </div>
 
-        <template x-if="step === 'phone'">
-            <div class="flex flex-1 flex-col justify-center gap-3 px-4 py-6">
-                <p class="text-sm text-gray-600">Masukkan nomor HP Anda untuk mulai chat dengan petugas.</p>
-                <input type="tel" x-model="phone" placeholder="08xxxxxxxxxx"
-                       @keydown.enter="startChat()"
-                       class="w-full rounded-md border-gray-300 text-sm text-gray-900 focus:border-sky-500 focus:ring-sky-500">
-                <div class="flex items-center gap-2">
-                    <div class="flex h-9 min-w-[110px] items-center justify-center rounded-md border border-gray-200 bg-gray-50 px-3">
-                        <span class="font-mono text-lg font-bold tracking-[0.3em] text-gray-800" x-text="captchaCode || '…'"></span>
-                    </div>
-                    <button type="button" @click="refreshCaptcha()" title="Ganti Kode"
-                            class="rounded-md border border-gray-200 px-2 py-1.5 text-xs text-gray-500 hover:bg-gray-50">
-                        &#8635;
-                    </button>
-                </div>
-                <input type="text" x-model="captcha" placeholder="Ketik ulang kode di atas" maxlength="5"
-                       @keydown.enter="startChat()"
-                       class="w-full rounded-md border-gray-300 text-sm uppercase tracking-widest text-gray-900 focus:border-sky-500 focus:ring-sky-500">
-                <p x-show="error" x-cloak x-text="error" class="text-xs text-rose-600"></p>
-                <button type="button" @click="startChat()" :disabled="starting"
-                        class="rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-500 disabled:opacity-60">
-                    <span x-text="starting ? 'Menghubungkan...' : 'Mulai Chat'">Mulai Chat</span>
-                </button>
-            </div>
-        </template>
+        <div x-show="step === 'phone'" x-cloak class="flex flex-1 flex-col justify-center gap-3 px-4 py-6">
+            <p class="text-sm text-gray-600">Masukkan nomor HP Anda untuk mulai chat dengan petugas.</p>
+            <input type="tel" x-model="phone" placeholder="08xxxxxxxxxx"
+                   @keydown.enter="startChat()"
+                   class="w-full rounded-md border-gray-300 text-sm text-gray-900 focus:border-sky-500 focus:ring-sky-500">
+            {{-- Widget di-render manual lewat grecaptcha.render() di chat-widget.js
+                 (bukan auto-render), supaya bisa dibedakan dari widget lain di halaman
+                 yang sama (mis. form pengaduan) lewat ID widget-nya sendiri. --}}
+            <div x-ref="recaptcha" data-sitekey="{{ config('services.recaptcha.site_key') }}"></div>
+            <p x-show="error" x-cloak x-text="error" class="text-xs text-rose-600"></p>
+            <button type="button" @click="startChat()" :disabled="starting"
+                    class="rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-500 disabled:opacity-60">
+                <span x-text="starting ? 'Menghubungkan...' : 'Mulai Chat'">Mulai Chat</span>
+            </button>
+        </div>
 
         <div x-show="step === 'chat'" class="flex flex-1 flex-col overflow-hidden">
             <div x-show="historyHidden" x-cloak class="border-b border-gray-100 bg-gray-50 px-3 py-2 text-center">

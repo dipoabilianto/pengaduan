@@ -25,7 +25,7 @@
                 2 => ['name', 'phone'],
                 3 => ['what', 'who', 'where', 'when', 'how', 'why'],
                 4 => ['attachments'],
-                5 => ['captcha'],
+                5 => ['g-recaptcha-response'],
             ];
             $initialStep = 1;
             foreach ($stepFields as $stepNumber => $fields) {
@@ -151,21 +151,13 @@
                     <input type="file" name="attachments[]" multiple accept=".jpg,.jpeg,.png,.pdf" class="mt-4 w-full rounded-lg border border-dashed border-white/20 bg-white/5 p-4 text-sm text-slate-300 file:mr-4 file:rounded-lg file:border-0 file:bg-sky-500 file:px-3 file:py-1.5 file:text-white">
                 </div>
 
-                {{-- Step 5: CAPTCHA — kode dikirim sebagai teks (bukan gambar), dirender
-                     sebagai HTML biasa supaya selalu tajam & besar di layar manapun. --}}
+                {{-- Step 5: reCAPTCHA v2 — widget Google me-render sendiri lewat script di
+                     layout (components/layouts/public.blade.php) dan otomatis menyisipkan
+                     input tersembunyi "g-recaptcha-response" saat form ini di-submit. --}}
                 <div x-show="step === 5" x-cloak>
                     <h2 class="text-lg font-semibold">5. Verifikasi</h2>
-                    <p class="mt-1 text-xs text-slate-400">Ketik ulang kode di bawah ini.</p>
-                    <div class="mt-4 flex items-center gap-3">
-                        <div class="flex h-[70px] min-w-[200px] items-center justify-center rounded-lg border border-white/15 bg-white/5 px-6">
-                            <span class="font-mono text-4xl font-bold tracking-[0.35em] text-slate-100" x-text="captchaCode || '…'"></span>
-                        </div>
-                        <button type="button" @click="refreshCaptcha()" class="rounded-lg border border-white/20 px-3 py-2 text-xs text-slate-200 hover:bg-white/10">
-                            Ganti Kode
-                        </button>
-                    </div>
-                    <label class="mt-4 block text-sm font-medium text-slate-200">Masukkan kode di atas <span class="text-rose-300">*</span></label>
-                    <input type="text" name="captcha" x-model="form.captcha" required maxlength="5" class="mt-1 w-40 rounded-lg border-white/15 bg-white/10 text-2xl uppercase tracking-widest text-slate-100 focus:border-sky-400 focus:ring-sky-400">
+                    <p class="mt-1 text-xs text-slate-400">Centang kotak verifikasi di bawah ini.</p>
+                    <div class="g-recaptcha mt-4" data-sitekey="{{ config('services.recaptcha.site_key') }}"></div>
                 </div>
 
                 {{-- Navigation --}}
@@ -209,22 +201,12 @@
                     when: '{{ old('when', '') }}',
                     how: '{{ old('how', '') }}',
                     why: '{{ old('why', '') }}',
-                    captcha: '',
-                },
-                captchaCode: '',
-                init() {
-                    this.refreshCaptcha();
-                },
-                refreshCaptcha() {
-                    fetch('{{ route('captcha') }}')
-                        .then((response) => response.json())
-                        .then((data) => { this.captchaCode = data.code; });
                 },
                 canNext(currentStep) {
                     if (currentStep === 1) return this.form.type && this.form.category;
                     if (currentStep === 2) return this.form.phone;
                     if (currentStep === 3) return this.form.what;
-                    if (currentStep === 5) return this.form.captcha;
+                    if (currentStep === 5) return typeof grecaptcha === 'undefined' || grecaptcha.getResponse() !== '';
                     return true;
                 },
             };

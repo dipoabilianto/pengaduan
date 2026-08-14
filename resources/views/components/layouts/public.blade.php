@@ -10,6 +10,7 @@
     <link rel="icon" href="{{ $faviconUrl ?? asset('favicon.ico') }}">
 
     @vite(['resources/css/app.css', 'resources/js/app.js', 'resources/js/chat-widget.js'])
+    <script src="https://www.google.com/recaptcha/api.js" async defer></script>
 </head>
 <body class="min-h-screen bg-gradient-to-br from-sky-950 via-blue-900 to-slate-900 text-slate-100 antialiased">
     <div class="pointer-events-none fixed inset-0 overflow-hidden">

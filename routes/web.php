@@ -12,7 +12,6 @@ use App\Http\Controllers\Admin\ReportController as AdminReportController;
 use App\Http\Controllers\Admin\RoleController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\WhatsAppSettingsController;
-use App\Http\Controllers\CaptchaController;
 use App\Http\Controllers\ProfileController;
 use App\Http\Controllers\Public\ChatBroadcastAuthController;
 use App\Http\Controllers\Public\ChatController;
@@ -25,8 +24,6 @@ Route::get('/', HomeController::class)->name('public.home');
 // Statistik & daftar pengaduan digabung ke halaman utama (Bab 4.4/8.2 PDR).
 Route::redirect('/statistik', '/#statistik', 301)->name('public.dashboard');
 Route::redirect('/daftar-pengaduan', '/#daftar-pengaduan', 301)->name('public.reports.index');
-
-Route::get('/captcha', CaptchaController::class)->name('captcha');
 
 // GET /pengaduan (tanpa /buat) cuma dipakai POST untuk submit form — kalau diakses
 // langsung lewat browser (URL diketik manual/bookmark lama) sebelumnya 405. Arahkan

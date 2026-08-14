@@ -7,6 +7,7 @@ use App\Models\ChatTicket;
 use App\Models\User;
 use App\Services\AiSettingsService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
@@ -16,14 +17,14 @@ class ChatAiDispatchTest extends TestCase
     use RefreshDatabase;
 
     /**
-     * /chat/mulai requires a solved CAPTCHA (see StartChatRequest) — same helper as
-     * ChatTest.
+     * /chat/mulai requires a verified reCAPTCHA v2 token (see StartChatRequest) — same
+     * helper as ChatTest.
      */
     private function startChat(string $phone, array $extra = []): TestResponse
     {
-        $code = $this->getJson(route('captcha'))->json('code');
+        Http::fake(['www.google.com/recaptcha/*' => Http::response(['success' => true])]);
 
-        return $this->postJson(route('chat.start'), array_merge(['phone' => $phone, 'captcha' => $code], $extra));
+        return $this->postJson(route('chat.start'), array_merge(['phone' => $phone, 'g-recaptcha-response' => 'test-token'], $extra));
     }
 
     private function configureAi(): void

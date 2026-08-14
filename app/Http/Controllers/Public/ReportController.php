@@ -23,11 +23,9 @@ class ReportController extends Controller
     public function store(StoreReportRequest $request): RedirectResponse
     {
         $report = $this->reports->submit(
-            $request->safe()->except(['attachments', 'captcha']),
+            $request->safe()->except(['attachments', 'g-recaptcha-response']),
             $request->file('attachments', []),
         );
-
-        session()->forget('captcha');
 
         return redirect()
             ->route('report.success', $report->ticket_no);

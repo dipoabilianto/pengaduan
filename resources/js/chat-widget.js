@@ -31,6 +31,19 @@ const CTA_ACTIONS = {
 };
 
 /**
+ * The widget script loads async — grecaptcha.render() isn't available the instant
+ * this module runs, so poll briefly instead of relying on a global onload callback
+ * (simpler to reason about alongside this widget's own Alpine lifecycle).
+ */
+function whenRecaptchaReady(callback) {
+    if (window.grecaptcha && window.grecaptcha.render) {
+        callback();
+        return;
+    }
+    setTimeout(() => whenRecaptchaReady(callback), 100);
+}
+
+/**
  * Exposed as a plain global (not Alpine.data() via the alpine:init event) —
  * chat-widget.js is a separate Vite entry from app.js, which already calls
  * Alpine.start() at its own top-level (module scripts execute in document
@@ -43,8 +56,7 @@ window.chatWidget = function chatWidget() {
         open: false,
         step: 'phone',
         phone: '',
-        captcha: '',
-        captchaCode: '',
+        recaptchaWidgetId: null,
         pendingTicketNo: null,
         ticketId: null,
         messages: [],
@@ -75,7 +87,7 @@ window.chatWidget = function chatWidget() {
             localStorage.removeItem('sidumas_chat_phone');
             localStorage.removeItem('sidumas_chat_ticket_id');
 
-            this.refreshCaptcha();
+            this.renderRecaptcha();
             this.resumeFromSession();
 
             window.addEventListener('chat-widget:open', (event) => {
@@ -119,9 +131,15 @@ window.chatWidget = function chatWidget() {
                 .finally(() => { this.starting = false; });
         },
 
-        refreshCaptcha() {
-            window.axios.get('/captcha')
-                .then((res) => { this.captchaCode = res.data.code; });
+        renderRecaptcha() {
+            whenRecaptchaReady(() => {
+                if (! this.$refs.recaptcha || this.recaptchaWidgetId !== null) {
+                    return;
+                }
+                this.recaptchaWidgetId = window.grecaptcha.render(this.$refs.recaptcha, {
+                    sitekey: this.$refs.recaptcha.dataset.sitekey,
+                });
+            });
         },
 
         startChat() {
@@ -130,17 +148,31 @@ window.chatWidget = function chatWidget() {
                 return;
             }
 
+            const recaptchaResponse = this.recaptchaWidgetId !== null
+                ? window.grecaptcha.getResponse(this.recaptchaWidgetId)
+                : '';
+
+            if (! recaptchaResponse) {
+                this.error = 'Selesaikan verifikasi captcha terlebih dahulu.';
+                return;
+            }
+
             this.error = null;
             this.starting = true;
 
-            window.axios.post('/chat/mulai', { phone: this.phone, related_ticket_no: this.pendingTicketNo, captcha: this.captcha })
+            window.axios.post('/chat/mulai', {
+                phone: this.phone,
+                related_ticket_no: this.pendingTicketNo,
+                'g-recaptcha-response': recaptchaResponse,
+            })
                 .then((res) => this.enterTicket(res.data))
                 .catch((err) => {
-                    this.error = err.response?.data?.errors?.captcha?.[0]
+                    this.error = err.response?.data?.errors?.['g-recaptcha-response']?.[0]
                         ?? err.response?.data?.errors?.phone?.[0]
                         ?? 'Gagal memulai chat. Coba lagi.';
-                    this.captcha = '';
-                    this.refreshCaptcha();
+                    if (this.recaptchaWidgetId !== null) {
+                        window.grecaptcha.reset(this.recaptchaWidgetId);
+                    }
                 })
                 .finally(() => { this.starting = false; });
         },
@@ -303,7 +335,9 @@ window.chatWidget = function chatWidget() {
             this.ratingComment = '';
             this.phone = '';
             this.step = 'phone';
-            this.refreshCaptcha();
+            if (this.recaptchaWidgetId !== null) {
+                window.grecaptcha.reset(this.recaptchaWidgetId);
+            }
             window.axios.post('/chat/keluar').catch(() => {});
         },
 

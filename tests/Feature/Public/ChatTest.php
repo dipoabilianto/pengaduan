@@ -6,6 +6,7 @@ use App\Models\ChatMessage;
 use App\Models\ChatRating;
 use App\Models\ChatTicket;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Testing\TestResponse;
 use Tests\TestCase;
 
@@ -14,16 +15,15 @@ class ChatTest extends TestCase
     use RefreshDatabase;
 
     /**
-     * /chat/mulai requires a solved CAPTCHA (see StartChatRequest) — fetches a fresh
-     * code from the session (mirroring what the widget's refreshCaptcha() does) and
-     * submits it alongside the phone number. A solved code is forgotten by the
-     * controller on success, so each call needs its own fresh one.
+     * /chat/mulai requires a verified reCAPTCHA v2 token (see StartChatRequest /
+     * App\Rules\RecaptchaV2) — Google's siteverify endpoint is faked so tests never
+     * depend on network access or a real site/secret key pair.
      */
     private function startChat(string $phone, array $extra = []): TestResponse
     {
-        $code = $this->getJson(route('captcha'))->json('code');
+        Http::fake(['www.google.com/recaptcha/*' => Http::response(['success' => true])]);
 
-        return $this->postJson(route('chat.start'), array_merge(['phone' => $phone, 'captcha' => $code], $extra));
+        return $this->postJson(route('chat.start'), array_merge(['phone' => $phone, 'g-recaptcha-response' => 'test-token'], $extra));
     }
 
     public function test_starting_a_chat_creates_a_ticket_and_returns_a_session_token(): void
@@ -42,18 +42,18 @@ class ChatTest extends TestCase
         $response = $this->postJson(route('chat.start'), ['phone' => '081234567890']);
 
         $response->assertStatus(422);
-        $response->assertJsonValidationErrors('captcha');
+        $response->assertJsonValidationErrors('g-recaptcha-response');
         $this->assertSame(0, ChatTicket::count());
     }
 
     public function test_starting_a_chat_with_a_wrong_captcha_is_rejected(): void
     {
-        $this->getJson(route('captcha'));
+        Http::fake(['www.google.com/recaptcha/*' => Http::response(['success' => false])]);
 
-        $response = $this->postJson(route('chat.start'), ['phone' => '081234567890', 'captcha' => 'SALAH']);
+        $response = $this->postJson(route('chat.start'), ['phone' => '081234567890', 'g-recaptcha-response' => 'bad-token']);
 
         $response->assertStatus(422);
-        $response->assertJsonValidationErrors('captcha');
+        $response->assertJsonValidationErrors('g-recaptcha-response');
         $this->assertSame(0, ChatTicket::count());
     }
 
