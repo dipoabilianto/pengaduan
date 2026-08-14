@@ -49,7 +49,7 @@
             </div>
             <div id="chat-widget-thread" x-ref="thread" class="flex-1 space-y-2 overflow-y-auto bg-gray-50 px-3 py-3">
                 <template x-for="message in messages" :key="message.id">
-                    <div :class="message.sender_type === 'citizen' ? 'ml-auto bg-sky-600 text-white' : 'mr-auto bg-white text-gray-700 border border-gray-200'"
+                    <div :class="[message.sender_type === 'citizen' ? 'ml-auto bg-sky-600 text-white' : 'mr-auto bg-white text-gray-700 border border-gray-200', message.pending ? 'opacity-60' : '']"
                          class="max-w-[85%] rounded-lg px-3 py-2 text-sm">
                         <p x-show="message.sender_type !== 'citizen'" x-text="message.sender_name" class="mb-0.5 text-xs font-semibold text-sky-600"></p>
                         <p x-text="message.body" class="whitespace-pre-line"></p>
@@ -58,7 +58,7 @@
                                class="mt-2 inline-block rounded-md bg-sky-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-sky-500"
                                x-text="ctaFor(message.cta_action)?.label"></a>
                         </template>
-                        <p class="mt-1 text-right text-[10px] opacity-60" x-text="formatTime(message.created_at)"></p>
+                        <p class="mt-1 text-right text-[10px] opacity-60" x-text="message.pending ? 'Mengirim…' : formatTime(message.created_at)"></p>
                     </div>
                 </template>
                 <div x-show="officerTyping" x-cloak x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"

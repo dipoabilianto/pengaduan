@@ -231,7 +231,18 @@ window.chatWidget = function chatWidget() {
             this.echo = makeGuestEcho();
             this.echo.private(`chat.${this.ticketId}`)
                 .listen('.message.sent', (event) => {
-                    this.messages.push(event);
+                    // The citizen's own message is shown optimistically the instant they
+                    // hit "Kirim" (see send()) rather than waiting for this broadcast to
+                    // round-trip back — reconcile with the real, server-confirmed copy
+                    // (real id/created_at) instead of appending a second bubble for it.
+                    const pendingIndex = event.sender_type === 'citizen'
+                        ? this.messages.findIndex((m) => m.pending)
+                        : -1;
+                    if (pendingIndex !== -1) {
+                        this.messages.splice(pendingIndex, 1, event);
+                    } else {
+                        this.messages.push(event);
+                    }
                     if (! this.open) {
                         this.unread++;
                     }
@@ -297,10 +308,28 @@ window.chatWidget = function chatWidget() {
             const body = this.draft;
             this.draft = '';
 
+            // Shown immediately rather than waiting on the HTTP request + broadcast
+            // round-trip — that gap (network + server processing + WebSocket delivery)
+            // was reading as "the button doesn't work" even though the send itself is
+            // fine. Reconciled with the real message once its broadcast arrives (see
+            // subscribe()'s .listen('.message.sent', ...)), or removed below on failure.
+            const tempId = `pending-${Date.now()}`;
+            this.messages.push({
+                id: tempId,
+                sender_type: 'citizen',
+                sender_name: 'Anda',
+                body,
+                cta_action: null,
+                created_at: new Date().toISOString(),
+                pending: true,
+            });
+            this.$nextTick(() => this.scrollToBottom());
+
             window.axios.post(`/chat/${this.ticketId}/pesan`, { message: body })
                 .then(() => { this.lastCitizenActivityAt = Date.now(); })
                 .catch(() => {
                     this.error = 'Pesan gagal terkirim. Coba lagi.';
+                    this.messages = this.messages.filter((m) => m.id !== tempId);
                     this.draft = body;
                 })
                 .finally(() => { this.sending = false; });
