@@ -61,10 +61,13 @@
                     </div>
                 </template>
                 <div x-show="officerTyping" x-cloak x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
-                     class="mr-auto flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-3 py-3">
-                    <span class="h-1.5 w-1.5 animate-bounce rounded-full bg-gray-400" style="animation-delay: 0ms"></span>
-                    <span class="h-1.5 w-1.5 animate-bounce rounded-full bg-gray-400" style="animation-delay: 150ms"></span>
-                    <span class="h-1.5 w-1.5 animate-bounce rounded-full bg-gray-400" style="animation-delay: 300ms"></span>
+                     class="mr-auto flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs italic text-gray-400">
+                    <span>Petugas sedang mengetik</span>
+                    <span class="flex items-center gap-0.5">
+                        <span class="h-1 w-1 animate-bounce rounded-full bg-gray-400" style="animation-delay: 0ms"></span>
+                        <span class="h-1 w-1 animate-bounce rounded-full bg-gray-400" style="animation-delay: 150ms"></span>
+                        <span class="h-1 w-1 animate-bounce rounded-full bg-gray-400" style="animation-delay: 300ms"></span>
+                    </span>
                 </div>
             </div>
             <div x-show="awaitingRating" x-cloak class="border-t border-gray-100 bg-gray-50 px-3 py-3 text-center">
