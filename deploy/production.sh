@@ -35,18 +35,25 @@ if [[ -z "${PHP_BIN:-}" ]] && ! command -v php >/dev/null; then
 fi
 PHP_BIN="${PHP_BIN:-$(command -v php || true)}"
 echo "==> PHP           : $PHP_BIN ($("$PHP_BIN" -r 'echo PHP_VERSION;' 2>/dev/null || echo '?'))"
+ORIGINAL_PHP_BIN="$PHP_BIN"
 
 # ==== Auto-heal proc_open (hosting shared mengunci proc_open di disable_functions) ====
 # Wrapper per-user `php -d disable_functions=` — -d diproses SETELAH semua ini (termasuk
 # scan-dir), sehingga seluruh daftar fungsi yang diblokir dikosongkan tanpa menyentuh
 # file php.ini server. Semua ekstensi dipertahankan apa adanya.
+# PENTING: wrapper ini HANYA dipakai untuk proses deploy ini (Composer butuh proc_open).
+# Cron produksi (queue worker & scheduler) tetap memakai $ORIGINAL_PHP_BIN yang restriksinya
+# utuh — kalau dibiarkan longgar permanen, itu melemahkan proteksi shared hosting untuk
+# proses yang jalan terus-menerus, bukan cuma sekali saat deploy.
 ensure_proc_open() {
     local pbin="$PHP_BIN"
-    if "$pbin" -r 'exit(function_exists("proc_open") ? 0 : 1);' 2>/dev/null; then
+    # proc_open dibutuhkan Composer; shell_exec dibutuhkan Tinker/PsySH (dipakai untuk
+    # buat akun admin). Hosting bisa memblokir salah satu atau keduanya secara terpisah.
+    if "$pbin" -r 'exit((function_exists("proc_open") && function_exists("shell_exec")) ? 0 : 1);' 2>/dev/null; then
         return 0
     fi
     echo
-    echo "==> proc_open nonaktif di $pbin — membuat wrapper PHP tanpa blokir fungsi ..."
+    echo "==> proc_open/shell_exec nonaktif di $pbin — membuat wrapper PHP tanpa blokir fungsi ..."
 
     local home bin
     home="${HOME:-/tmp}"
@@ -59,10 +66,10 @@ exec "$pbin" -d disable_functions= "\$@"
 EOF
     chmod 700 "$bin"
 
-    if "$bin" -r 'exit(function_exists("proc_open") ? 0 : 1);' 2>/dev/null; then
+    if "$bin" -r 'exit((function_exists("proc_open") && function_exists("shell_exec")) ? 0 : 1);' 2>/dev/null; then
         PHP_BIN="$bin"
         export PATH="$home/.sidumas-bin:$PATH"
-        echo "==> OK — memakai $bin (proc_open aktif; berlaku hanya untuk proses deploy ini)."
+        echo "==> OK — memakai $bin (proc_open & shell_exec aktif; berlaku hanya untuk proses deploy ini)."
         return 0
     fi
 
@@ -249,10 +256,32 @@ echo "==> seed role/permission (tanpa user uji-coba)"
 "$PHP_BIN" artisan db:seed --class=RolesTableSeeder --force
 
 echo
-echo "==> buat akun admin superuser"
+echo "==> cek akun admin"
 export SIDUMAS_ADMIN_EMAIL="$ADMIN_EMAIL"
-export SIDUMAS_ADMIN_PASSWORD="$ADMIN_PASSWORD"
-"$PHP_BIN" artisan tinker --execute="\$u = App\\Models\\User::updateOrCreate(['email' => getenv('SIDUMAS_ADMIN_EMAIL'), 'name' => 'Admin Utama', 'password' => getenv('SIDUMAS_ADMIN_PASSWORD'), 'email_verified_at' => now()]); \$u->assignRole('superuser'); echo 'OK admin: '.\$u->email.PHP_EOL;"
+ADMIN_EXISTS="$("$PHP_BIN" artisan tinker --execute="echo App\\Models\\User::where('email', getenv('SIDUMAS_ADMIN_EMAIL'))->exists() ? 'yes' : 'no';" 2>/dev/null | tail -n1 | tr -d '[:space:]')"
+
+RESET_PASSWORD=1
+if [[ "$ADMIN_EXISTS" == "yes" ]]; then
+    echo "Akun admin dengan email $ADMIN_EMAIL sudah ada."
+    if [[ "${SIDUMAS_ADMIN_RESET_PASSWORD:-}" == "1" ]]; then
+        echo "SIDUMAS_ADMIN_RESET_PASSWORD=1 -> password akan ditimpa."
+    elif [[ -t 0 ]]; then
+        read -rp "Timpa password akun ini dengan yang baru saja dimasukkan? (y/N): " confirm
+        [[ "$confirm" =~ ^[Yy]$ ]] || RESET_PASSWORD=0
+    else
+        echo "Non-interaktif & SIDUMAS_ADMIN_RESET_PASSWORD tidak diset -> password TIDAK diubah."
+        RESET_PASSWORD=0
+    fi
+fi
+
+if [[ "$RESET_PASSWORD" == "1" ]]; then
+    echo "==> buat/reset akun admin superuser"
+    export SIDUMAS_ADMIN_PASSWORD="$ADMIN_PASSWORD"
+    "$PHP_BIN" artisan tinker --execute="\$u = App\\Models\\User::updateOrCreate(['email' => getenv('SIDUMAS_ADMIN_EMAIL')], ['name' => 'Admin Utama', 'password' => getenv('SIDUMAS_ADMIN_PASSWORD'), 'email_verified_at' => now()]); \$u->assignRole('superuser'); echo 'OK admin (password diset): '.\$u->email.PHP_EOL;"
+else
+    echo "==> lewati reset password, pastikan role superuser saja"
+    "$PHP_BIN" artisan tinker --execute="\$u = App\\Models\\User::where('email', getenv('SIDUMAS_ADMIN_EMAIL'))->first(); if (\$u && !\$u->hasRole('superuser')) { \$u->assignRole('superuser'); } echo 'OK admin (password TIDAK diubah): '.getenv('SIDUMAS_ADMIN_EMAIL').PHP_EOL;"
+fi
 
 echo
 echo "==> permission folder"
@@ -281,8 +310,14 @@ echo "      mv public_html public_html.bak"
 echo "      ln -s $PROJECT_DIR/public public_html"
 echo "    (alternatif: Domains -> Manage -> Document Root -> $PROJECT_DIR/public)"
 echo " 2. Cron Jobs (sesuaikan path PHP & user):"
-echo "    * * * * * ${PHP_BIN} $PROJECT_DIR/artisan schedule:run >> /dev/null 2>&1"
-echo "    * * * * * ${PHP_BIN} $PROJECT_DIR/artisan queue:work --stop-when-empty --max-time=55 --tries=3 >> $PROJECT_DIR/storage/logs/queue-cron.log 2>&1"
+echo "    * * * * * ${ORIGINAL_PHP_BIN} $PROJECT_DIR/artisan schedule:run >> /dev/null 2>&1"
+echo "    * * * * * ${ORIGINAL_PHP_BIN} $PROJECT_DIR/artisan queue:work --stop-when-empty --max-time=55 --tries=3 >> $PROJECT_DIR/storage/logs/queue-cron.log 2>&1"
+if [[ "$PHP_BIN" != "$ORIGINAL_PHP_BIN" ]]; then
+    echo "    CATATAN: proc_open sempat di-heal khusus untuk Composer di deploy ini ($PHP_BIN)."
+    echo "    Cron di atas SENGAJA memakai PHP asli ($ORIGINAL_PHP_BIN) dengan disable_functions"
+    echo "    utuh. Kalau queue worker/scheduler ternyata butuh proc_open juga, minta hosting"
+    echo "    aktifkan resmi lewat MultiPHP INI Editor — jangan pakai wrapper ini permanen."
+fi
 echo " 3. Kalau belum: unggah public/build (tanpa Node di server) ke $PROJECT_DIR/public/build."
 echo " 4. Aktifkan SSL/AutoSSL, pastikan APP_URL memakai https."
 echo " 5. Verifikasi: /up, login admin, submit laporan, chat realtime."
