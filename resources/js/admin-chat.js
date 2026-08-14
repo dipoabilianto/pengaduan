@@ -22,11 +22,15 @@ document.addEventListener('DOMContentLoaded', () => {
         channel.listen('.message.sent', (event) => {
             const bubble = document.createElement('div');
             const isOfficer = event.sender_type === 'officer';
-            bubble.className = (isOfficer ? 'ml-auto bg-sky-600 text-white' : 'mr-auto bg-white text-gray-700 border border-gray-200')
-                + ' max-w-[75%] rounded-lg px-3 py-2 text-sm mb-2';
+            const isAi = event.sender_type === 'ai';
+            const isOrgSide = isOfficer || isAi;
+            const sideClass = isOfficer ? 'ml-auto bg-sky-600 text-white'
+                : isAi ? 'ml-auto bg-emerald-600 text-white'
+                : 'mr-auto bg-white text-gray-700 border border-gray-200';
+            bubble.className = sideClass + ' max-w-[75%] rounded-lg px-3 py-2 text-sm mb-2';
 
             const nameEl = document.createElement('p');
-            nameEl.className = 'mb-0.5 text-xs font-semibold ' + (isOfficer ? 'text-sky-100' : 'text-sky-600');
+            nameEl.className = 'mb-0.5 text-xs font-semibold ' + (isOfficer ? 'text-sky-100' : isAi ? 'text-emerald-100' : 'text-sky-600');
             nameEl.textContent = event.sender_name;
             bubble.appendChild(nameEl);
 
@@ -34,6 +38,13 @@ document.addEventListener('DOMContentLoaded', () => {
             bodyEl.className = 'whitespace-pre-line';
             bodyEl.textContent = event.body;
             bubble.appendChild(bodyEl);
+
+            const timeEl = document.createElement('p');
+            timeEl.className = 'mt-1 text-right text-[10px] opacity-60';
+            timeEl.textContent = event.created_at
+                ? new Date(event.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+                : '';
+            bubble.appendChild(timeEl);
 
             threadEl.appendChild(bubble);
             threadEl.scrollTop = threadEl.scrollHeight;

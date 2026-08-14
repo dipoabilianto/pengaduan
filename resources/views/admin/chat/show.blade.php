@@ -79,7 +79,13 @@
                 <div id="chat-thread" data-ticket-id="{{ $ticket->id }}" class="h-96 space-y-2 overflow-y-auto p-4">
                     @foreach ($ticket->messages as $message)
                         @php
+                            // Officer and AI both speak "for the office" — grouped on the same
+                            // (right) side, distinguished only by color, so at a glance the
+                            // citizen's side (left) vs. the office's side (right) is what reads
+                            // first, and who-on-our-side is the secondary detail.
                             $isOfficer = $message->sender_type === 'officer';
+                            $isAi = $message->sender_type === 'ai';
+                            $isOrgSide = $isOfficer || $isAi;
                             $senderName = match ($message->sender_type) {
                                 'officer' => $message->sender?->name ?? 'Petugas ULP',
                                 'ai' => 'Adelia Natata Herbi',
@@ -90,10 +96,12 @@
                         <div @class([
                             'max-w-[75%] rounded-lg px-3 py-2 text-sm mb-2',
                             'ml-auto bg-sky-600 text-white' => $isOfficer,
-                            'mr-auto bg-white text-gray-700 border border-gray-200' => ! $isOfficer,
+                            'ml-auto bg-emerald-600 text-white' => $isAi,
+                            'mr-auto bg-white text-gray-700 border border-gray-200' => ! $isOrgSide,
                         ])>
-                            <p @class(['mb-0.5 text-xs font-semibold', 'text-sky-100' => $isOfficer, 'text-sky-600' => ! $isOfficer])>{{ $senderName }}</p>
+                            <p @class(['mb-0.5 text-xs font-semibold', 'text-sky-100' => $isOfficer, 'text-emerald-100' => $isAi, 'text-sky-600' => ! $isOrgSide])>{{ $senderName }}</p>
                             <p class="whitespace-pre-line">{{ $message->body }}</p>
+                            <p class="mt-1 text-right text-[10px] opacity-60">{{ $message->created_at?->format('H.i.s') }}</p>
                         </div>
                     @endforeach
                 </div>
@@ -131,8 +139,12 @@
                                    class="flex-1 rounded-md border-gray-300 text-sm focus:border-sky-500 focus:ring-sky-500">
                             @if ($isAiConfigured)
                                 <button type="button" @click="polish()" :disabled="polishing"
-                                        class="shrink-0 rounded-md border border-sky-300 px-3 py-2 text-xs font-medium text-sky-700 hover:bg-sky-50 disabled:opacity-60">
-                                    <span x-text="polishing ? 'Merapikan...' : 'Haluskan dengan AI'">Haluskan dengan AI</span>
+                                        class="shrink-0 flex items-center gap-1.5 rounded-md border border-sky-300 px-3 py-2 text-xs font-medium text-sky-700 hover:bg-sky-50 disabled:opacity-60">
+                                    <svg x-show="polishing" x-cloak class="h-3.5 w-3.5 animate-spin text-sky-700" viewBox="0 0 24 24" fill="none">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                                    </svg>
+                                    <span x-text="polishing ? 'Merapikan… (bisa sampai 20 detik)' : 'Haluskan dengan AI'">Haluskan dengan AI</span>
                                 </button>
                             @endif
                             <input type="hidden" name="raw_draft" x-model="rawDraft">
