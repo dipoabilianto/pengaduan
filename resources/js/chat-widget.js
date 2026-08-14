@@ -138,9 +138,9 @@ window.chatWidget = function chatWidget() {
                 }
                 this.recaptchaWidgetId = window.grecaptcha.render(this.$refs.recaptcha, {
                     sitekey: this.$refs.recaptcha.dataset.sitekey,
-                    // "normal" size (304px) is wider than the widget panel itself
-                    // (320px minus padding = 288px) — compact (216px) actually fits.
-                    size: 'compact',
+                    // "compact" isn't just smaller, it's a different (squarer) layout
+                    // that looked off — kept "normal" (default) and shrunk it with a
+                    // CSS scale on the ref'd container instead (see chat-widget.blade.php).
                 });
             });
         },

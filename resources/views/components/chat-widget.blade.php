@@ -27,8 +27,12 @@
                    class="w-full rounded-md border-gray-300 text-sm text-gray-900 focus:border-sky-500 focus:ring-sky-500">
             {{-- Widget di-render manual lewat grecaptcha.render() di chat-widget.js
                  (bukan auto-render), supaya bisa dibedakan dari widget lain di halaman
-                 yang sama (mis. form pengaduan) lewat ID widget-nya sendiri. --}}
-            <div x-ref="recaptcha" data-sitekey="{{ config('services.recaptcha.site_key') }}"></div>
+                 yang sama (mis. form pengaduan) lewat ID widget-nya sendiri. Ukuran
+                 "normal" (bukan "compact" — proporsinya beda/aneh, cuma dikecilkan
+                 lewat CSS scale supaya bentuknya tetap sama seperti aslinya). --}}
+            <div style="width: 258px; height: 66px; overflow: hidden;">
+                <div x-ref="recaptcha" data-sitekey="{{ config('services.recaptcha.site_key') }}" style="transform: scale(0.85); transform-origin: 0 0;"></div>
+            </div>
             <p x-show="error" x-cloak x-text="error" class="text-xs text-rose-600"></p>
             <button type="button" @click="startChat()" :disabled="starting"
                     class="rounded-md bg-sky-600 px-4 py-2 text-sm font-medium text-white hover:bg-sky-500 disabled:opacity-60">

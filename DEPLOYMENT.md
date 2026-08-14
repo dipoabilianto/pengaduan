@@ -76,9 +76,24 @@ npm ci
 npm run build
 ```
 
-Kalau tidak tersedia — build di laptop/komputer lokal (`npm run build` di clone proyek yang
-sama), lalu unggah folder `public/build/` hasilnya lewat File Manager/SFTP ke lokasi `public/`
-di server.
+**Kalau tidak tersedia (kasus umum di shared hosting) — build di laptop/komputer lokal**,
+lalu unggah folder `public/build/` hasilnya lewat File Manager/SFTP ke lokasi `public/` di
+server. **PENTING**: `.env` lokal biasanya `BROADCAST_CONNECTION=reverb` (dev pakai Reverb
+self-hosted) — build biasa (`npm run build`) akan mem-bake konfigurasi Reverb LOKAL itu ke
+dalam JS, bukan Pusher produksi, sehingga broadcast (chat realtime) gagal diam-diam di
+production (gejalanya: pesan baru cuma muncul setelah refresh manual — sudah pernah kejadian
+nyata). `VITE_PUSHER_APP_KEY`/`VITE_PUSHER_APP_CLUSTER` di-bake ke JS saat build time, bukan
+dibaca runtime, jadi harus override ke nilai Pusher **produksi** (bukan lokal) saat build:
+
+```bash
+# Ambil dulu dari server: grep -E '^PUSHER_APP_KEY|^PUSHER_APP_CLUSTER' ~/<project>/.env
+# (nilai KEY/CLUSTER aman dibagikan — bukan APP_SECRET, memang untuk JS browser publik)
+VITE_BROADCAST_DRIVER=pusher VITE_PUSHER_APP_KEY=<dari_server> VITE_PUSHER_APP_CLUSTER=<dari_server> npm run build
+```
+
+Supaya tidak perlu diketik ulang tiap deploy, simpan ketiga baris itu di `.env.production`
+(root proyek, sudah di-`.gitignore`) — Vite otomatis memuatnya untuk `npm run build` karena
+mode default-nya "production", tanpa perlu prefix env var manual lagi.
 
 ## 5. Konfigurasi `.env`
 

@@ -214,7 +214,12 @@
                 <div x-show="step === 5" x-cloak x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 translate-x-3" x-transition:enter-end="opacity-100 translate-x-0">
                     <h2 class="text-lg font-semibold">5. Verifikasi</h2>
                     <p class="mt-1 text-xs text-slate-400">Centang kotak verifikasi di bawah ini.</p>
-                    <div class="g-recaptcha mt-4" data-sitekey="{{ config('services.recaptcha.site_key') }}" data-size="compact"></div>
+                    {{-- Ukuran "normal" (bukan "compact" — proporsinya beda/aneh), cuma
+                         dikecilkan lewat CSS scale supaya bentuknya tetap sama seperti
+                         aslinya, sekadar muat di lebar form. --}}
+                    <div class="mt-4" style="width: 258px; height: 66px; overflow: hidden;">
+                        <div class="g-recaptcha" data-sitekey="{{ config('services.recaptcha.site_key') }}" style="transform: scale(0.85); transform-origin: 0 0;"></div>
+                    </div>
                 </div>
 
                 {{-- Navigation --}}
