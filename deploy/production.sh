@@ -14,7 +14,7 @@
 #   DEPS="npm ci && npm run build" bash ...          # lewati build bila DEPS kosong
 #
 # Semua nilai bisa di-prefill lewat env var (prompt dilewati). Prefix SIDUMAS_:
-#   SIDUMAS_DOMAIN, SIDUMAS_DB_DATABASE, SIDUMAS_DB_USERNAME, SIDUMAS_DB_PASSWORD,
+#   SIDUMAS_APP_NAME, SIDUMAS_DOMAIN, SIDUMAS_DB_DATABASE, SIDUMAS_DB_USERNAME, SIDUMAS_DB_PASSWORD,
 #   SIDUMAS_PUSHER_APP_ID, _PUSHER_APP_KEY, _PUSHER_APP_SECRET, _PUSHER_APP_CLUSTER,
 #   SIDUMAS_MAIL_MAILER, _MAIL_HOST, _MAIL_USERNAME, _MAIL_PASSWORD, _MAIL_FROM_ADDRESS,
 #   SIDUMAS_ADMIN_EMAIL, SIDUMAS_ADMIN_PASSWORD
@@ -88,7 +88,7 @@ if command -v composer >/dev/null 2>&1; then
 fi
 
 # Impor prefill dari env SIDUMAS_* (nilai dari env menang, prompt dilewati).
-for suffix in DOMAIN DB_DATABASE DB_USERNAME DB_PASSWORD \
+for suffix in APP_NAME DOMAIN DB_DATABASE DB_USERNAME DB_PASSWORD \
               PUSHER_APP_ID PUSHER_APP_KEY PUSHER_APP_SECRET PUSHER_APP_CLUSTER \
               MAIL_MAILER MAIL_HOST MAIL_USERNAME MAIL_PASSWORD MAIL_FROM_ADDRESS \
               ADMIN_EMAIL ADMIN_PASSWORD; do
@@ -133,6 +133,10 @@ prompt_secret() {
     [[ "${!var:-}" == "$v2" ]] || { echo "ERROR: tidak cocok."; exit 1; }
     [[ -n "${!var:-}" ]] || { echo "ERROR: kosong."; exit 1; }
 }
+
+echo
+echo "==> Nama aplikasi (tampil di judul tab browser, header, email, dst)"
+prompt APP_NAME "Nama aplikasi" "KATA-KITA"
 
 echo
 echo "==> Domain produksi (tanpa https:// — mis. pengaduan.disdukcapil.id)"
@@ -200,7 +204,7 @@ cat >> .env <<EOF
 
 $MARKER
 # Dibuat otomatis oleh deploy/production.sh pada $(date -Is)
-APP_NAME="SI-WBS Disdukcapil Tubaba"
+APP_NAME="${APP_NAME}"
 APP_ENV=production
 APP_DEBUG=false
 APP_URL=https://${DOMAIN}
@@ -304,19 +308,28 @@ fi
 echo
 echo "================================================================"
 echo "SELESAI. Langkah manual yang tersisa:"
-echo " 1. Document root — cara paling mudah pakai symlink (SSH):"
+echo " 1. Document root — PENTING: cek dulu di cPanel -> Domains apakah public_html DIPAKAI"
+echo "    BERSAMA oleh beberapa domain/subdomain lain (biasa di akun addon/subdomain,"
+echo "    tiap domain punya subfolder sendiri di dalam public_html). Kalau ya, JANGAN mv/ln"
+echo "    public_html itu sendiri (bisa mematikan domain lain) — ganti cuma subfoldernya:"
+echo "      cd ~/public_html"
+echo "      mv <namadomain> <namadomain>.bak"
+echo "      ln -s $PROJECT_DIR/public <namadomain>"
+echo "    Kalau domain ini memang satu-satunya penghuni akun (public_html murni miliknya):"
 echo "      cd ~"
 echo "      mv public_html public_html.bak"
 echo "      ln -s $PROJECT_DIR/public public_html"
-echo "    (alternatif: Domains -> Manage -> Document Root -> $PROJECT_DIR/public)"
+echo "    (alternatif paling aman: Domains -> Manage -> Document Root -> $PROJECT_DIR/public)"
 echo " 2. Cron Jobs (sesuaikan path PHP & user):"
-echo "    * * * * * ${ORIGINAL_PHP_BIN} $PROJECT_DIR/artisan schedule:run >> /dev/null 2>&1"
+echo "    * * * * * ${PHP_BIN} $PROJECT_DIR/artisan schedule:run >> /dev/null 2>&1"
 echo "    * * * * * ${ORIGINAL_PHP_BIN} $PROJECT_DIR/artisan queue:work --stop-when-empty --max-time=55 --tries=3 >> $PROJECT_DIR/storage/logs/queue-cron.log 2>&1"
 if [[ "$PHP_BIN" != "$ORIGINAL_PHP_BIN" ]]; then
-    echo "    CATATAN: proc_open sempat di-heal khusus untuk Composer di deploy ini ($PHP_BIN)."
-    echo "    Cron di atas SENGAJA memakai PHP asli ($ORIGINAL_PHP_BIN) dengan disable_functions"
-    echo "    utuh. Kalau queue worker/scheduler ternyata butuh proc_open juga, minta hosting"
-    echo "    aktifkan resmi lewat MultiPHP INI Editor — jangan pakai wrapper ini permanen."
+    echo "    CATATAN: proc_open/shell_exec sempat di-heal khusus untuk deploy ini ($PHP_BIN)."
+    echo "    schedule:run SENGAJA memakai PHP yang di-heal itu — Laravel scheduler butuh"
+    echo "    proc_open untuk menjalankan Schedule::command(...) (cek routes/console.php)."
+    echo "    queue:work memakai PHP asli ($ORIGINAL_PHP_BIN) karena job biasa tidak butuh itu."
+    echo "    Kalau mau lebih rapi jangka panjang, minta hosting aktifkan proc_open/shell_exec"
+    echo "    resmi lewat MultiPHP INI Editor, lalu kedua cron bisa pakai PHP asli."
 fi
 echo " 3. Kalau belum: unggah public/build (tanpa Node di server) ke $PROJECT_DIR/public/build."
 echo " 4. Aktifkan SSL/AutoSSL, pastikan APP_URL memakai https."
