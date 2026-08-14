@@ -79,6 +79,7 @@ window.chatWidget = function chatWidget() {
         selectedRatingScale: null,
         ratingComment: '',
         ratingSaving: false,
+        savedScrollY: 0,
 
         init() {
             // One-time cleanup — a pre-session-based build of this widget cached the raw
@@ -87,6 +88,17 @@ window.chatWidget = function chatWidget() {
             // sitting in the browser.
             localStorage.removeItem('sidumas_chat_phone');
             localStorage.removeItem('sidumas_chat_ticket_id');
+
+            // $watch (not just handling it inside toggle()) so this fires no matter how
+            // `open` changes — including the header's close button, which flips it
+            // directly via @click="open = false" rather than going through a method.
+            this.$watch('open', (isOpen) => {
+                if (isOpen) {
+                    this.lockBodyScroll();
+                } else {
+                    this.unlockBodyScroll();
+                }
+            });
 
             this.renderRecaptcha();
             this.resumeFromSession();
@@ -112,6 +124,38 @@ window.chatWidget = function chatWidget() {
                 // up now that it's opening.
                 this.$nextTick(() => this.scrollToBottom());
             }
+        },
+
+        /**
+         * On mobile the widget takes over the full screen (see chat-widget.blade.php's
+         * fixed inset-0), but the page underneath is still a normal scrollable <body> —
+         * a touch-scroll gesture starting inside the widget's own thread can "chain"
+         * into the page behind it once the thread hits its own scroll boundary,
+         * dragging the whole page along ("chat box dibuka di pertengahan halaman, saat
+         * scroll... halaman ikut ter-scroll"). Desktop is untouched — there the widget
+         * is a small floating box, not a takeover, so the page should stay scrollable.
+         * `overflow: hidden` on <body> alone is known to be unreliable for this on iOS
+         * Safari/WebKit — position: fixed + restoring scrollY on unlock is the
+         * established cross-browser-safe technique.
+         */
+        lockBodyScroll() {
+            if (window.matchMedia('(min-width: 640px)').matches) {
+                return;
+            }
+            this.savedScrollY = window.scrollY;
+            document.body.style.position = 'fixed';
+            document.body.style.top = `-${this.savedScrollY}px`;
+            document.body.style.width = '100%';
+        },
+
+        unlockBodyScroll() {
+            if (document.body.style.position !== 'fixed') {
+                return;
+            }
+            document.body.style.position = '';
+            document.body.style.top = '';
+            document.body.style.width = '';
+            window.scrollTo(0, this.savedScrollY || 0);
         },
 
         /**
