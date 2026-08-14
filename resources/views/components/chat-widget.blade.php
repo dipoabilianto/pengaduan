@@ -58,6 +58,7 @@
                                class="mt-2 inline-block rounded-md bg-sky-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-sky-500"
                                x-text="ctaFor(message.cta_action)?.label"></a>
                         </template>
+                        <p class="mt-1 text-right text-[10px] opacity-60" x-text="formatTime(message.created_at)"></p>
                     </div>
                 </template>
                 <div x-show="officerTyping" x-cloak x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"

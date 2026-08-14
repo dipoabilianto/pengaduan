@@ -354,6 +354,17 @@ window.chatWidget = function chatWidget() {
             return CTA_ACTIONS[action] ?? null;
         },
 
+        /**
+         * Local wall-clock time (WIB or whatever the citizen's device is set to) per
+         * message, so delays between sending and an AI/officer reply are visible at a
+         * glance instead of only inferred from the "typing…" indicator's duration.
+         */
+        formatTime(isoString) {
+            if (! isoString) return '';
+
+            return new Date(isoString).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        },
+
         sendRating() {
             if (! this.selectedRatingScale || this.ratingSaving) {
                 return;
