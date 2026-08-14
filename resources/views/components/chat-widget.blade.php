@@ -6,7 +6,7 @@
 --}}
 <div x-data="chatWidget()" x-cloak class="fixed bottom-5 right-5 z-50">
     <div x-show="open" x-transition x-cloak
-         class="fixed inset-0 z-50 flex h-[100dvh] w-full flex-col overflow-hidden bg-white sm:static sm:z-auto sm:mb-3 sm:h-[28rem] sm:w-80 sm:flex-none sm:rounded-2xl sm:border sm:border-gray-200 sm:shadow-2xl">
+         class="ios-fixed-layer fixed inset-0 z-50 flex h-[100dvh] w-full flex-col overflow-hidden bg-white sm:static sm:z-auto sm:mb-3 sm:h-[28rem] sm:w-80 sm:flex-none sm:rounded-2xl sm:border sm:border-gray-200 sm:shadow-2xl">
         <div class="flex items-center justify-between bg-sky-600 px-4 py-3 text-white">
             <div class="flex items-center gap-2">
                 <img src="{{ asset('images/maskot-ulp.png') }}" alt="Maskot ULP" class="h-10 w-8 shrink-0 rounded-md object-cover object-top">

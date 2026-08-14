@@ -13,7 +13,7 @@
     <script src="https://www.google.com/recaptcha/api.js" async defer></script>
 </head>
 <body class="min-h-screen overflow-x-hidden bg-gradient-to-br from-sky-950 via-blue-900 to-slate-900 text-slate-100 antialiased">
-    <div class="pointer-events-none fixed inset-0 overflow-hidden">
+    <div class="ios-fixed-layer pointer-events-none fixed inset-0 overflow-hidden">
         <div class="absolute -top-24 -left-24 h-96 w-96 rounded-full bg-sky-500/20 blur-3xl"></div>
         <div class="absolute top-1/3 -right-24 h-96 w-96 rounded-full bg-indigo-500/20 blur-3xl"></div>
         <div class="absolute bottom-0 left-1/3 h-96 w-96 rounded-full bg-cyan-400/10 blur-3xl"></div>

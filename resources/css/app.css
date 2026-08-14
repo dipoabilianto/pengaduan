@@ -6,6 +6,21 @@
     display: none !important;
 }
 
+/* iOS WebKit (Safari, and Chrome/any browser on iOS — Apple requires the same engine
+   underneath) has a long-documented bug where `position: fixed` elements aren't kept on
+   their own compositing layer by default, so during an active touch-scroll gesture they
+   visually drag/lag with the page content instead of staying put, snapping back only
+   once the scroll settles — reported live as "background ikut ter-scroll". Forcing GPU
+   compositing (translateZ(0) + will-change) is the standard fix. Applied narrowly (the
+   page background decoration, layouts/components/layouts/public.blade.php, and the chat
+   widget's own fixed panel, resources/views/components/chat-widget.blade.php) rather
+   than broadly, since will-change has a real memory/GPU cost if overused. */
+.ios-fixed-layer {
+    transform: translateZ(0);
+    -webkit-transform: translateZ(0);
+    will-change: transform;
+}
+
 /* Status tracker (resources/views/components/status-tracker.blade.php) */
 @keyframes tracker-pop {
     from { opacity: 0; transform: translateY(6px) scale(0.92); }
