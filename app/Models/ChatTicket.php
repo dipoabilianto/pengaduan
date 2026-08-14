@@ -129,9 +129,14 @@ class ChatTicket extends Model
 
     public function recordIncoming(string $preview): void
     {
+        // Str::limit()'s $limit is the length BEFORE it appends "..." — a preview that
+        // actually gets truncated ends up limit+3 chars long, 3 over this column's
+        // VARCHAR(240) on a strict-mode MySQL (silently fine on SQLite, which doesn't
+        // enforce column length — this broke only in production). Limit to 237 so the
+        // truncated result (237 + "...") never exceeds 240.
         $this->update([
             'last_message_at' => now(),
-            'last_message_preview' => Str::limit($preview, 240),
+            'last_message_preview' => Str::limit($preview, 237),
         ]);
     }
 

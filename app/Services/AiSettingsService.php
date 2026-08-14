@@ -129,13 +129,17 @@ class AiSettingsService
     }
 
     /**
-     * A 5xx or a raw connection/timeout failure (no "API error: N" match at all — see
-     * describeFailure()) is a one-off provider/network hiccup, not something a retry
-     * would just repeat (unlike a bad key or malformed response). Deliberately excludes
-     * 429: that needs real backoff time to clear (see isRateLimited/ScoreReportUrgencyJob),
-     * which a single inline retry within the same job run can't provide — callers wanting
-     * an immediate one-shot retry (AnswerChatMessageWithAiJob, where a citizen is waiting
-     * and re-queuing would cost a full cron cycle) should use this instead of isRateLimited.
+     * A 5xx is a fast, definite provider-side rejection — a one-off hiccup worth one
+     * immediate retry (unlike a bad key or malformed response, which would just fail
+     * identically again). A raw connection/timeout failure (no "API error: N" match at
+     * all — see describeFailure()) is deliberately NOT included here even though it's
+     * also "transient": each provider call already waits up to its own Http::timeout()
+     * (30s) before giving up, so retrying one inline can double the worst-case wait
+     * (observed in production: a chat answer taking ~1 minute instead of failing at
+     * ~30s) — exactly the outcome a citizen-facing, latency-sensitive caller like
+     * AnswerChatMessageWithAiJob can least afford. Deliberately excludes 429 too: that
+     * needs real backoff time to clear (see isRateLimited/ScoreReportUrgencyJob), which
+     * a single inline retry within the same job run can't provide anyway.
      */
     public function isTransientFailure(Throwable $e): bool
     {
@@ -143,7 +147,7 @@ class AiSettingsService
             return (int) $matches[1] >= 500;
         }
 
-        return true;
+        return false;
     }
 
     /**

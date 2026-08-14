@@ -12,6 +12,24 @@ class ChatTicketTest extends TestCase
 {
     use RefreshDatabase;
 
+    /**
+     * Str::limit($text, 240) does NOT guarantee a ≤240-char result — it appends "..."
+     * AFTER truncating to 240, so a genuinely long preview becomes 243 chars. SQLite
+     * (local dev) never enforces the column's VARCHAR(240) limit and stayed silent;
+     * strict-mode MySQL (production) rejected the update outright, and since this runs
+     * right before the broadcast() call in PostChatAiReplyJob, the citizen never saw
+     * the reply live — only after a manual refresh (the message row itself still saved,
+     * broadcasting just never ran). Regression test for that real production failure.
+     */
+    public function test_record_incoming_never_exceeds_the_preview_columns_length(): void
+    {
+        $ticket = ChatTicket::findOrStartFor('081234567890');
+
+        $ticket->recordIncoming(str_repeat('a', 500));
+
+        $this->assertLessThanOrEqual(240, strlen($ticket->fresh()->last_message_preview));
+    }
+
     public function test_same_phone_number_reuses_the_same_ticket_while_it_is_still_active(): void
     {
         $first = ChatTicket::findOrStartFor('081234567890');
