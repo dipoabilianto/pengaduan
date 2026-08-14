@@ -247,11 +247,17 @@ window.chatWidget = function chatWidget() {
                 // has no live socket to whisper from) — deliberately reuses the exact
                 // same "Petugas sedang mengetik…" indicator rather than a separate one,
                 // since the citizen doesn't need to know whether AI or a human answers.
-                // Longer window: covers the AI call itself PLUS the simulated human-typing
-                // delay before a found answer is actually posted (up to ~6s, see
-                // AnswerChatMessageWithAiJob::typingDelayFor) — re-broadcast right as that
-                // delay begins, so this window just needs to outlast it with margin.
-                .listen('.assistant.typing', () => this.showTypingIndicator(8000))
+                // Broadcast twice per reply: once immediately when the message is sent
+                // (ChatController::sendMessage, instant feedback) and again right before
+                // AnswerChatMessageWithAiJob actually calls the AI — which, on shared
+                // hosting's cron-polled queue, can run tens of seconds later. A short
+                // window (previously 8s) let the first indicator time out and disappear
+                // in that gap, so the second broadcast made it visibly flash back on —
+                // looked like it fired twice. Long enough to bridge one full cron cycle
+                // (queue:work's --max-time=55) so the indicator stays continuously up
+                // between the two broadcasts instead of flickering; the real reply
+                // arriving clears it immediately regardless (.listen('.message.sent')).
+                .listen('.assistant.typing', () => this.showTypingIndicator(60000))
                 // Fires the moment any of the three closers (citizen confirming done, 6h
                 // auto-close, officer's "Tandai Selesai") marks the ticket selesai — lets
                 // the rating card appear live without the citizen needing to reload.
