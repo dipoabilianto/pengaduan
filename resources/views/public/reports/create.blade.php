@@ -157,7 +157,7 @@
                 <div x-show="step === 5" x-cloak>
                     <h2 class="text-lg font-semibold">5. Verifikasi</h2>
                     <p class="mt-1 text-xs text-slate-400">Centang kotak verifikasi di bawah ini.</p>
-                    <div class="g-recaptcha mt-4" data-sitekey="{{ config('services.recaptcha.site_key') }}"></div>
+                    <div class="g-recaptcha mt-4" data-sitekey="{{ config('services.recaptcha.site_key') }}" data-size="compact"></div>
                 </div>
 
                 {{-- Navigation --}}

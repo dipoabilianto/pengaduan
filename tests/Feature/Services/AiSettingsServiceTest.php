@@ -62,6 +62,22 @@ class AiSettingsServiceTest extends TestCase
         $this->assertStringContainsString('koneksi/timeout', $service->recentFailureReason());
     }
 
+    public function test_transient_failure_covers_server_errors_and_unrecognised_connection_issues(): void
+    {
+        $service = app(AiSettingsService::class);
+
+        $this->assertTrue($service->isTransientFailure(new RuntimeException('Gemini API error: 503 {"error":"unavailable"}')));
+        $this->assertTrue($service->isTransientFailure(new RuntimeException('cURL error 28: Operation timed out')));
+    }
+
+    public function test_transient_failure_excludes_rate_limits_and_client_errors(): void
+    {
+        $service = app(AiSettingsService::class);
+
+        $this->assertFalse($service->isTransientFailure(new RuntimeException('Gemini API error: 429 {"error":"quota"}')));
+        $this->assertFalse($service->isTransientFailure(new RuntimeException('OpenAI API error: 401 {"error":"unauthorized"}')));
+    }
+
     public function test_record_success_clears_a_previous_failure(): void
     {
         $service = app(AiSettingsService::class);

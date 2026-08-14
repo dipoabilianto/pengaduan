@@ -129,6 +129,24 @@ class AiSettingsService
     }
 
     /**
+     * A 5xx or a raw connection/timeout failure (no "API error: N" match at all — see
+     * describeFailure()) is a one-off provider/network hiccup, not something a retry
+     * would just repeat (unlike a bad key or malformed response). Deliberately excludes
+     * 429: that needs real backoff time to clear (see isRateLimited/ScoreReportUrgencyJob),
+     * which a single inline retry within the same job run can't provide — callers wanting
+     * an immediate one-shot retry (AnswerChatMessageWithAiJob, where a citizen is waiting
+     * and re-queuing would cost a full cron cycle) should use this instead of isRateLimited.
+     */
+    public function isTransientFailure(Throwable $e): bool
+    {
+        if (preg_match('/API error: (\d+)/', $e->getMessage(), $matches)) {
+            return (int) $matches[1] >= 500;
+        }
+
+        return true;
+    }
+
+    /**
      * Every provider client (App\Services\Ai\*Client) throws a RuntimeException formatted
      * as "{Provider} API error: {status} {body}" — classify by that status code so Admin
      * sees what's actually wrong instead of a generic "AI failed" message.

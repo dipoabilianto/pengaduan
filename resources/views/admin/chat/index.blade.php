@@ -34,6 +34,28 @@
                 @endif
             </div>
 
+            @if ($recentEscalations->isNotEmpty())
+                <details class="mb-4 rounded-lg bg-white p-4 shadow">
+                    <summary class="cursor-pointer text-sm font-medium text-gray-500">
+                        Pesan yang Belum Terjawab AI ({{ $recentEscalations->count() }} terbaru)
+                    </summary>
+                    <p class="mt-2 text-xs text-gray-400">
+                        Kalau ada pola pertanyaan berulang di sini, pertimbangkan menambah info-nya ke
+                        <a href="{{ route('admin.settings.chat-facts') }}" class="underline">Pengaturan &rarr; Fakta AI</a>.
+                    </p>
+                    <ul class="mt-3 space-y-2 text-sm">
+                        @foreach ($recentEscalations as $message)
+                            <li class="border-t border-gray-100 pt-2">
+                                <a href="{{ route('admin.chat.show', $message->ticket) }}" class="text-gray-700 hover:text-sky-600">
+                                    {{ \Illuminate\Support\Str::limit($message->body, 140) }}
+                                </a>
+                                <span class="ml-2 text-xs text-gray-400">{{ $message->created_at?->diffForHumans() }}</span>
+                            </li>
+                        @endforeach
+                    </ul>
+                </details>
+            @endif
+
             <div class="rounded-lg bg-white shadow">
                 <div class="overflow-x-auto rounded-lg">
                     <table class="min-w-full divide-y divide-gray-200 text-sm">

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\PolishChatDraftRequest;
 use App\Http\Requests\Admin\SendOfficerChatMessageRequest;
 use App\Http\Requests\Admin\UpdateChatStatusRequest;
+use App\Models\ChatMessage;
 use App\Models\ChatRating;
 use App\Models\ChatTicket;
 use App\Services\Ai\AiClientFactory;
@@ -14,6 +15,7 @@ use App\Services\ChatAdminService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
 use InvalidArgumentException;
@@ -38,7 +40,28 @@ class ChatTicketController extends Controller
                 ->orderByDesc('last_message_at')
                 ->paginate(20),
             'ratingSummary' => $this->ratingSummary(),
+            'recentEscalations' => $this->recentEscalations(),
         ]);
+    }
+
+    /**
+     * Raw list, not clustered/summarized — that judgment call (spotting a recurring
+     * topic the AI keeps failing on) is for a human to make by skimming the actual
+     * wording, not something worth building NLP grouping for at this scale. Gives
+     * Admin the signal for "what Facts should I add?" (see ChatFactsService) that
+     * previously only existed scattered across individual ticket transcripts.
+     *
+     * @return Collection<int, ChatMessage>
+     */
+    private function recentEscalations(): Collection
+    {
+        return ChatMessage::query()
+            ->where('sender_type', ChatMessage::SENDER_CITIZEN)
+            ->where('escalation_flag', true)
+            ->with('ticket:id')
+            ->latest('created_at')
+            ->limit(10)
+            ->get();
     }
 
     /**

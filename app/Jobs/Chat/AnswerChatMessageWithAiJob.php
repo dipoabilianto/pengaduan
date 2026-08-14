@@ -7,6 +7,7 @@ use App\Events\Chat\ChatTicketUpdated;
 use App\Models\ChatMessage;
 use App\Models\ChatTicket;
 use App\Services\Ai\AiClientFactory;
+use App\Services\Ai\AiClientInterface;
 use App\Services\AiSettingsService;
 use App\Services\ChatAdminService;
 use App\Services\ChatFactsService;
@@ -81,7 +82,7 @@ class AnswerChatMessageWithAiJob implements ShouldQueue
         }
 
         try {
-            $result = $client->answerChatMessage($this->buildContext($ticket, $facts));
+            $result = $this->callAi($client, $ticket, $facts, $aiSettings);
 
             if ($result['needs_human'] || ! $result['message']) {
                 // Per the prompt, "needs_human" is reserved for the deadlock case ONLY:
@@ -172,6 +173,37 @@ class AnswerChatMessageWithAiJob implements ShouldQueue
 
             $aiSettings->recordFailureFrom($e, 'chat');
             $this->escalate();
+        }
+    }
+
+    /**
+     * A citizen is waiting on this call, so there's no time budget for a queue-level
+     * retry-with-backoff (the next attempt wouldn't run until the following cron cycle,
+     * up to ~1 minute away — worse than just escalating). Instead: one immediate inline
+     * retry for a transient failure (provider 5xx, connection/timeout — see
+     * AiSettingsService::isTransientFailure()) only, since that's the one class of error
+     * where trying again right now has a real chance of succeeding. Anything else (bad
+     * key, malformed response) propagates straight to handle()'s catch block as before.
+     *
+     * @return array{message: ?string, needs_human: bool, offer_escalation: bool, cta: ?string, citizen_confirmed_done: bool}
+     */
+    private function callAi(AiClientInterface $client, ChatTicket $ticket, ChatFactsService $facts, AiSettingsService $aiSettings): array
+    {
+        $context = $this->buildContext($ticket, $facts);
+
+        try {
+            return $client->answerChatMessage($context);
+        } catch (Throwable $e) {
+            if (! $aiSettings->isTransientFailure($e)) {
+                throw $e;
+            }
+
+            Log::info('Transient AI error answering chat message, retrying once inline.', [
+                'chat_ticket_id' => $ticket->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return $client->answerChatMessage($context);
         }
     }
 

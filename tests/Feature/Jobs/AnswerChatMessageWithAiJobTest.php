@@ -150,6 +150,51 @@ class AnswerChatMessageWithAiJobTest extends TestCase
         $this->assertTrue($message->fresh()->escalation_flag);
     }
 
+    /**
+     * A transient failure (provider 5xx) gets one immediate inline retry before falling
+     * back to escalation — no queue-level backoff/re-dispatch, since a citizen is waiting
+     * and the next cron cycle could be up to a minute away. See
+     * AiSettingsService::isTransientFailure() and AnswerChatMessageWithAiJob::callAi().
+     */
+    public function test_a_transient_failure_is_retried_once_inline_and_can_still_succeed(): void
+    {
+        Queue::fake();
+        $this->configureAi();
+        Http::fakeSequence('generativelanguage.googleapis.com/*')
+            ->push('server error', 500)
+            ->push([
+                'candidates' => [
+                    ['content' => ['parts' => [['text' => json_encode(['needs_human' => false, 'message' => 'Kantor buka Senin-Jumat.'])]]]],
+                ],
+            ]);
+        $ticket = ChatTicket::findOrStartFor('081234567890');
+        $message = $this->citizenMessage($ticket);
+
+        $this->handleJob(new AnswerChatMessageWithAiJob($message));
+
+        Queue::assertPushed(PostChatAiReplyJob::class, fn ($job) => $job->body === 'Kantor buka Senin-Jumat.');
+        $this->assertFalse($message->fresh()->escalation_flag);
+    }
+
+    /**
+     * A non-transient failure (bad API key, 401) must escalate straight away — retrying
+     * would just fail identically, wasting the one shot a citizen is waiting on.
+     */
+    public function test_a_non_transient_failure_escalates_without_retrying(): void
+    {
+        $this->configureAi();
+        Http::fakeSequence('generativelanguage.googleapis.com/*')
+            ->push('unauthorized', 401)
+            ->push('should never be reached', 500);
+        $ticket = ChatTicket::findOrStartFor('081234567890');
+        $message = $this->citizenMessage($ticket);
+
+        $this->handleJob(new AnswerChatMessageWithAiJob($message));
+
+        $this->assertTrue($message->fresh()->escalation_flag);
+        Http::assertSentCount(1);
+    }
+
     public function test_does_nothing_when_ai_is_not_configured(): void
     {
         Queue::fake();

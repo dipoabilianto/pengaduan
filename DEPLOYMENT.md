@@ -10,7 +10,8 @@ kustom ke publik. Dua konsekuensi arsitektur dari batasan itu:
    `resources/js/echo-config.js` dan `ChatBroadcastAuthController`).
 2. **Queue worker jalan lewat cron, bukan proses permanen.** `php artisan queue:work` yang
    dibiarkan jalan terus akan mati kena limit proses/CPU hosting. Cron tiap menit yang
-   menjalankan `queue:work --stop-when-empty` adalah pola standar untuk shared/cloud hosting.
+   menjalankan `queue:work` (TANPA `--stop-when-empty` — lihat catatan di langkah 7) adalah
+   pola standar untuk shared/cloud hosting.
 
 ## 1. Persiapan
 
@@ -163,17 +164,29 @@ Di cPanel → Cron Jobs, tambahkan (sesuaikan path ke lokasi proyek dan versi PH
 
 ```
 * * * * * /usr/local/bin/php83 /home/user/sidumas/artisan schedule:run >> /dev/null 2>&1
-* * * * * /usr/local/bin/php83 /home/user/sidumas/artisan queue:work --stop-when-empty --max-time=55 --tries=3 >> /home/user/sidumas/storage/logs/queue-cron.log 2>&1
+* * * * * /usr/local/bin/php83 /home/user/sidumas/artisan queue:work --max-time=55 --tries=3 >> /home/user/sidumas/storage/logs/queue-cron.log 2>&1
 ```
 
 - Baris pertama menjalankan scheduler (ringkasan harian jam 07:00, heartbeat AI tiap 5
   menit, nudge/auto-close chat tiap 15 menit — semua sudah didefinisikan di
-  `routes/console.php`, tidak perlu cron terpisah per job).
-- Baris kedua adalah "pengganti" queue worker permanen: tiap menit, proses job yang antre
-  sampai kosong atau maksimal 55 detik, lalu keluar sebelum cron berikutnya jalan. Ini
+  `routes/console.php`, tidak perlu cron terpisah per job). Kalau hosting mematikan
+  `proc_open`/`shell_exec` di `disable_functions` (umum di shared hosting — lihat
+  `deploy/production.sh`), Laravel scheduler butuh itu untuk menjalankan
+  `Schedule::command(...)` — pakai PHP binary yang sudah di-heal (lihat catatan akhir
+  skrip deploy), bukan PHP bawaan, kalau baris ini gagal dengan error proc_open.
+- Baris kedua adalah "pengganti" queue worker permanen: **JANGAN tambahkan
+  `--stop-when-empty`** — flag itu membuat worker langsung keluar begitu antrean kosong,
+  padahal balasan AI di chat sengaja diberi jeda simulasi "mengetik" (1,2–6 detik, lihat
+  `AnswerChatMessageWithAiJob::typingDelayFor()`) sebelum job kedua (`PostChatAiReplyJob`)
+  benar-benar tersedia untuk diproses. Kalau worker sudah keluar duluan, job kedua itu baru
+  tertangkap di **cron menit berikutnya** — menambah ~1 menit jeda ekstra di atas jeda
+  mengetik yang seharusnya cuma beberapa detik (pernah terjadi persis di produksi). Tanpa
+  `--stop-when-empty`, `queue:work` terus memeriksa antrean tiap beberapa detik selama
+  hampir 55 detik penuh, menangkap job yang baru tersedia di tengah siklus yang sama. Ini
   memproses penilaian AI, balasan chat AI, dan notifikasi WhatsApp/push/Instagram.
-  Konsekuensinya: ada jeda maksimal ~1 menit sebelum job baru mulai diproses (dibanding
-  worker permanen yang langsung memproses) — cukup untuk skala aplikasi ini.
+  Konsekuensinya: ada jeda maksimal ~1 menit sebelum pesan citizen PERTAMA mulai diproses
+  (dibanding worker permanen yang langsung memproses) — cukup untuk skala aplikasi ini,
+  dan balasan-balasan berikutnya dalam siklus yang sama jauh lebih cepat.
 
 ## 8. Setelah Deploy — Wajib Dicek
 
