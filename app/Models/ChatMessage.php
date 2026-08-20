@@ -51,4 +51,15 @@ class ChatMessage extends Model
     {
         return $this->belongsTo(User::class, 'sender_user_id');
     }
+
+    /**
+     * HTML-safe rendering of `body` with a minimal **bold** markdown convention
+     * (used by the chat AI to bold its own name — see chatAnswerSystemPrompt())
+     * converted to <strong>. Escape FIRST, then apply the markdown — otherwise a
+     * citizen typing raw HTML in their own message would be rendered unescaped.
+     */
+    public function formattedBody(): string
+    {
+        return preg_replace('/\*\*(.+?)\*\*/', '<strong>$1</strong>', e($this->body));
+    }
 }

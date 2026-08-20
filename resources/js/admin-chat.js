@@ -1,3 +1,5 @@
+import { formatMessageBody } from './chat-format';
+
 /**
  * Uses the existing global window.Echo (resources/js/echo.js, imported via app.js)
  * — admin pages are authenticated, so the default /broadcasting/auth route (which
@@ -36,7 +38,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const bodyEl = document.createElement('p');
             bodyEl.className = 'whitespace-pre-line';
-            bodyEl.textContent = event.body;
+            bodyEl.innerHTML = formatMessageBody(event.body);
             bubble.appendChild(bodyEl);
 
             const timeEl = document.createElement('p');

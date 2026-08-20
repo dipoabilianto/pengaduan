@@ -1,6 +1,7 @@
 import Echo from 'laravel-echo';
 import Pusher from 'pusher-js';
 import { broadcasterOptions } from './echo-config';
+import { formatMessageBody } from './chat-format';
 
 /**
  * Deliberately its OWN Echo instance, separate from the global window.Echo that
@@ -446,6 +447,10 @@ window.chatWidget = function chatWidget() {
             if (! isoString) return '';
 
             return new Date(isoString).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+        },
+
+        formatBody(text) {
+            return formatMessageBody(text);
         },
 
         sendRating() {
