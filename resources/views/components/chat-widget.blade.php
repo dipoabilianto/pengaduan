@@ -51,7 +51,7 @@
                 <template x-for="message in messages" :key="message.id">
                     <div :class="[message.sender_type === 'citizen' ? 'ml-auto bg-sky-600 text-white' : 'mr-auto bg-white text-gray-700 border border-gray-200', message.pending ? 'opacity-60' : '']"
                          class="max-w-[85%] rounded-lg px-3 py-2 text-sm">
-                        <p x-show="message.sender_type !== 'citizen'" x-text="message.sender_name" class="mb-0.5 text-xs font-semibold text-sky-600"></p>
+                        <p x-show="message.sender_type !== 'citizen'" x-text="message.sender_name" class="mb-0.5 text-xs font-bold text-sky-600"></p>
                         <p x-text="message.body" class="whitespace-pre-line"></p>
                         <template x-if="ctaFor(message.cta_action)">
                             <a :href="ctaFor(message.cta_action)?.href" target="_blank" rel="noopener"

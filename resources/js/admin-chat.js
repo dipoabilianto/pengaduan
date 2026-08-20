@@ -30,7 +30,7 @@ document.addEventListener('DOMContentLoaded', () => {
             bubble.className = sideClass + ' max-w-[75%] rounded-lg px-3 py-2 text-sm mb-2';
 
             const nameEl = document.createElement('p');
-            nameEl.className = 'mb-0.5 text-xs font-semibold ' + (isOfficer ? 'text-sky-100' : isAi ? 'text-emerald-100' : 'text-sky-600');
+            nameEl.className = 'mb-0.5 text-xs font-bold ' + (isOfficer ? 'text-sky-100' : isAi ? 'text-emerald-100' : 'text-sky-600');
             nameEl.textContent = event.sender_name;
             bubble.appendChild(nameEl);
 

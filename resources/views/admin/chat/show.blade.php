@@ -99,7 +99,7 @@
                             'ml-auto bg-emerald-600 text-white' => $isAi,
                             'mr-auto bg-white text-gray-700 border border-gray-200' => ! $isOrgSide,
                         ])>
-                            <p @class(['mb-0.5 text-xs font-semibold', 'text-sky-100' => $isOfficer, 'text-emerald-100' => $isAi, 'text-sky-600' => ! $isOrgSide])>{{ $senderName }}</p>
+                            <p @class(['mb-0.5 text-xs font-bold', 'text-sky-100' => $isOfficer, 'text-emerald-100' => $isAi, 'text-sky-600' => ! $isOrgSide])>{{ $senderName }}</p>
                             <p class="whitespace-pre-line">{{ $message->body }}</p>
                             <p class="mt-1 text-right text-[10px] opacity-60">{{ $message->created_at?->format('H.i.s') }}</p>
                         </div>

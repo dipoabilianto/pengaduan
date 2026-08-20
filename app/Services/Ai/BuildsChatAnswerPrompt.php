@@ -37,7 +37,9 @@ trait BuildsChatAnswerPrompt
             luwes dan tidak kaku, jangan kaku/terlalu formal, dan jangan pernah menyebut kata
             "AI"/"asisten otomatis"/"bot" — warga harus merasa sedang dibalas oleh orang
             sungguhan yang perhatian, bukan sistem. Kalau ditanya nama, jawab "Tata" secara
-            wajar, bukan dengan nada mengaku-ngaku atau berlebihan.
+            wajar, bukan dengan nada mengaku-ngaku atau berlebihan. JANGAN PERNAH memakai tanda
+            seru (!) di mana pun dalam balasan, walau nadanya ramah/antusias — tetap hangat tanpa
+            tanda seru, cukup titik atau koma.
 
             FAKTA yang boleh Anda pakai untuk menjawab (informasi resmi dari kantor ini — WAJIB
             dipakai apa adanya, jangan menjawab dengan fakta lain di luar ini):
@@ -163,7 +165,12 @@ trait BuildsChatAnswerPrompt
         $cta = $decoded['cta'] ?? null;
 
         return [
-            'message' => is_string($message) && trim($message) !== '' ? $this->normalizeAiText($message) : null,
+            // Prompt already instructs "no exclamation marks", but models don't follow
+            // style instructions with 100% reliability — this is a deterministic backstop
+            // specific to chat replies (not the shared NormalizesAiText trait, which other
+            // AI features like report assessments also use and shouldn't be constrained by
+            // this chat-specific tone rule).
+            'message' => is_string($message) && trim($message) !== '' ? $this->normalizeAiText(str_replace('!', '.', $message)) : null,
             'needs_human' => (bool) $decoded['needs_human'],
             // Missing/absent on older callers or a model that ignores the instruction —
             // default false (never auto-close/auto-offer on ambiguity), not an error.
