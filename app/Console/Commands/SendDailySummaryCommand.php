@@ -2,11 +2,13 @@
 
 namespace App\Console\Commands;
 
-use App\Jobs\SendDailySummaryToUserJob;
-use App\Models\Report;
-use App\Models\User;
+use App\Jobs\SendDailySummaryJob;
 use Illuminate\Console\Command;
 
+/**
+ * Wrapper CLI manual untuk SendDailySummaryJob. Penjadwalan asli ada di
+ * routes/console.php lewat Schedule::job(), bukan lewat command ini.
+ */
 class SendDailySummaryCommand extends Command
 {
     protected $signature = 'notify:daily-summary';
@@ -15,13 +17,9 @@ class SendDailySummaryCommand extends Command
 
     public function handle(): int
     {
-        $eligible = User::all()->filter(fn (User $user) => filled(Report::visibleStatusesFor($user)));
+        $count = (new SendDailySummaryJob)->handle();
 
-        foreach ($eligible as $user) {
-            SendDailySummaryToUserJob::dispatch($user);
-        }
-
-        $this->info("Ringkasan harian dijadwalkan untuk {$eligible->count()} pengguna.");
+        $this->info("Ringkasan harian dijadwalkan untuk {$count} pengguna.");
 
         return self::SUCCESS;
     }

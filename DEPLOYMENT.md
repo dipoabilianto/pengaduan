@@ -184,11 +184,28 @@ Di cPanel → Cron Jobs, tambahkan (sesuaikan path ke lokasi proyek dan versi PH
 
 - Baris pertama menjalankan scheduler (ringkasan harian jam 07:00, heartbeat AI tiap 5
   menit, nudge/auto-close chat tiap 15 menit — semua sudah didefinisikan di
-  `routes/console.php`, tidak perlu cron terpisah per job). Kalau hosting mematikan
-  `proc_open`/`shell_exec` di `disable_functions` (umum di shared hosting — lihat
-  `deploy/production.sh`), Laravel scheduler butuh itu untuk menjalankan
-  `Schedule::command(...)` — pakai PHP binary yang sudah di-heal (lihat catatan akhir
-  skrip deploy), bukan PHP bawaan, kalau baris ini gagal dengan error proc_open.
+  `routes/console.php`, tidak perlu cron terpisah per job). Semua entri di
+  `routes/console.php` SENGAJA memakai `Schedule::job(...)`, bukan
+  `Schedule::command(...)` — `Schedule::job()` dispatch langsung ke queue database
+  in-process, tidak butuh `proc_open` sama sekali, jadi PHP binary bawaan (bukan yang
+  di-heal) sudah cukup untuk baris ini.
+  **Latar belakang (insiden 2026-08-20):** sebelumnya scheduler memakai
+  `Schedule::command(...)` untuk `chat:process-inactive-tickets`, yang butuh `proc_open`
+  untuk fork subprocess. Saat hosting mematikan `proc_open` di `disable_functions`,
+  tugas itu gagal **diam-diam** selama berhari-hari — tiket chat tidak pernah ditutup
+  otomatis, tanpa alarm apa pun karena error hanya tercatat di `laravel.log`, bukan di
+  output cron (`>> /dev/null`). Sudah diperbaiki di kode dengan memindah semua jadwal ke
+  `Schedule::job(...)`; kalau menambah jadwal baru, jangan pakai `Schedule::command(...)`
+  lagi tanpa pertimbangan matang.
+- **Verifikasi WAJIB lewat `crontab -l`, bukan cuma tampilan cPanel.** Pada insiden yang
+  sama, sebuah perubahan cron yang "tersimpan" di UI cPanel Cron Jobs ternyata TIDAK
+  benar-benar tersimpan — baru ketahuan berhari-hari kemudian lewat `crontab -l` di
+  Terminal. Setiap kali mengedit cron di cPanel, langsung cek ulang dengan:
+  ```bash
+  crontab -l
+  ```
+  dan pastikan isinya benar-benar berubah sesuai yang dimaksud, jangan percaya begitu
+  saja pada konfirmasi "saved" dari UI.
 - Baris kedua adalah "pengganti" queue worker permanen: **JANGAN tambahkan
   `--stop-when-empty`** — flag itu membuat worker langsung keluar begitu antrean kosong,
   padahal balasan AI di chat sengaja diberi jeda simulasi "mengetik" (1,2–6 detik, lihat
